@@ -275,4 +275,132 @@ with st.container():
         with col2:
             if st.button("🔄 Convert Now", type="primary", use_container_width=True):
                 try:
-                    with st.spinner('Converti
+                    with st.spinner('Converting your PDF...'):
+                        converter = SmartPDFConverter()
+                        
+                        if conversion_mode == 'Smart (Transactions Only)':
+                            if output_format == 'Excel':
+                                # Convert to Excel
+                                excel_data = converter.convert_to_excel(uploaded_file)
+                                
+                                # Success message
+                                st.success('✅ Conversion complete!')
+                                
+                                # Download button
+                                st.download_button(
+                                    label="⬇️ Download Excel",
+                                    data=excel_data,
+                                    file_name=f"{uploaded_file.name.replace('.pdf', '')}_transactions.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    type="primary",
+                                    use_container_width=True
+                                )
+                                
+                                # Preview
+                                st.subheader("Preview")
+                                header, transactions = converter.extract_smart_transactions(uploaded_file)
+                                df_preview = pd.DataFrame(transactions[:10], columns=header)
+                                st.dataframe(df_preview, use_container_width=True)
+                                
+                                st.metric("Total Transactions", len(transactions))
+                                
+                            else:  # CSV
+                                # Convert to CSV
+                                csv_content = converter.convert_to_csv(uploaded_file)
+                                
+                                # Success message
+                                st.success('✅ Conversion complete!')
+                                
+                                # Download button
+                                st.download_button(
+                                    label="⬇️ Download CSV",
+                                    data=csv_content,
+                                    file_name=f"{uploaded_file.name.replace('.pdf', '')}_transactions.csv",
+                                    mime="text/csv",
+                                    type="primary",
+                                    use_container_width=True
+                                )
+                                
+                                # Preview
+                                st.subheader("Preview (First 10 rows)")
+                                preview_lines = csv_content.split('\n')[:11]
+                                st.text('\n'.join(preview_lines))
+                                
+                                row_count = len(csv_content.split('\n')) - 1
+                                st.metric("Total Transactions", row_count)
+                        
+                        else:  # Standard mode
+                            # Use basic extraction
+                            all_rows = []
+                            with pdfplumber.open(uploaded_file) as pdf:
+                                for page in pdf.pages:
+                                    tables = page.extract_tables()
+                                    for table in tables:
+                                        if table:
+                                            all_rows.extend(table)
+                            
+                            if output_format == 'Excel':
+                                df = pd.DataFrame(all_rows[1:], columns=all_rows[0] if all_rows else [])
+                                output = io.BytesIO()
+                                df.to_excel(output, index=False)
+                                excel_data = output.getvalue()
+                                
+                                st.success('✅ Conversion complete!')
+                                st.download_button(
+                                    label="⬇️ Download Excel",
+                                    data=excel_data,
+                                    file_name=f"{uploaded_file.name.replace('.pdf', '')}_output.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    type="primary",
+                                    use_container_width=True
+                                )
+                            else:
+                                output = io.StringIO()
+                                writer = csv.writer(output)
+                                writer.writerows(all_rows)
+                                csv_content = output.getvalue()
+                                
+                                st.success('✅ Conversion complete!')
+                                st.download_button(
+                                    label="⬇️ Download CSV",
+                                    data=csv_content,
+                                    file_name=f"{uploaded_file.name.replace('.pdf', '')}_output.csv",
+                                    mime="text/csv",
+                                    type="primary",
+                                    use_container_width=True
+                                )
+                        
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    st.info("💡 Try switching to Standard mode or check if your PDF is valid")
+
+# Features section
+st.markdown("---")
+st.markdown("### ✨ Features")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("""
+    - ✅ Smart transaction detection
+    - ✅ Auto-remove junk rows
+    - ✅ Excel & CSV output
+    - ✅ Ready-to-use data
+    """)
+
+with col2:
+    st.markdown("""
+    - ✅ Bank statement friendly
+    - ✅ No manual cleanup needed
+    - ✅ Correct column alignment
+    - ✅ Instant download
+    """)
+
+# Footer
+st.markdown("---")
+st.markdown(
+    "<p style='text-align: center; color: rgba(255,255,255,0.7); font-size: 0.9rem;'>"
+    "Built with Streamlit • Smart extraction powered by pdfplumber"
+    "</p>",
+    unsafe_allow_html=True
+)
