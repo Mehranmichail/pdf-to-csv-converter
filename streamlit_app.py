@@ -199,8 +199,8 @@ class UltraSmartPDFConverter:
                             date, trans_type, details, balance = self.extract_transaction_data(clean_row)
                             raw_transactions.append((date, trans_type, details, balance))
         
-        # Sort by balance (descending) to process chronologically
-        raw_transactions.sort(key=lambda x: self.clean_amount(x[3]), reverse=True)
+        # Sort by balance (ascending) to process chronologically
+        raw_transactions.sort(key=lambda x: self.clean_amount(x[3]), reverse=False)
         
         # Calculate Paid In/Out
         final_transactions = self.calculate_paid_in_out(raw_transactions)
