@@ -40,8 +40,33 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-class UltraSmartPDFConverter:
-    """Ultra-smart PDF converter that uses balance changes to determine Paid In/Out."""
+class FinalSmartPDFConverter:
+    """Smart PDF converter that sorts by DATE and calculates Paid In/Out from balance changes."""
+    
+    def parse_date(self, date_str: str) -> datetime:
+        """Parse date string to datetime for sorting."""
+        if not date_str:
+            return datetime.min
+        
+        date_str = str(date_str).strip()
+        
+        # Try different date formats
+        formats = [
+            '%d-%b-%y',      # 29-Apr-25
+            '%d %b %Y',      # 29 Apr 2025
+            '%d/%m/%Y',      # 29/04/2025
+            '%d/%m/%y',      # 29/04/25
+            '%Y-%m-%d',      # 2025-04-29
+            '%d-%m-%Y',      # 29-04-2025
+        ]
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except:
+                continue
+        
+        return datetime.min
     
     def is_date(self, text: str) -> bool:
         """Check if text looks like a date."""
@@ -124,16 +149,10 @@ class UltraSmartPDFConverter:
     
     def extract_transaction_data(self, row: List[str]) -> Tuple[str, str, str, str]:
         """Extract date, type, details, and balance from a row."""
-        # Clean the row
         row = [self.clean_cell(cell) for cell in row]
         
-        # Find date (first cell)
         date = row[0] if len(row) > 0 else ''
-        
-        # Find transaction type (second cell)
         trans_type = row[1] if len(row) > 1 else ''
-        
-        # Find details (third cell)
         details = row[2] if len(row) > 2 else ''
         
         # Find balance (last cell with an amount)
@@ -199,8 +218,8 @@ class UltraSmartPDFConverter:
                             date, trans_type, details, balance = self.extract_transaction_data(clean_row)
                             raw_transactions.append((date, trans_type, details, balance))
         
-        # Sort by balance (ascending) to process chronologically
-        raw_transactions.sort(key=lambda x: self.clean_amount(x[3]), reverse=False)
+        # Sort by DATE (chronologically)
+        raw_transactions.sort(key=lambda x: self.parse_date(x[0]))
         
         # Calculate Paid In/Out
         final_transactions = self.calculate_paid_in_out(raw_transactions)
@@ -274,7 +293,7 @@ with st.container():
         )
     
     if conversion_mode == 'Smart (Transactions Only)':
-        st.info("🧠 **Smart Mode:** Automatically calculates Paid In/Out from balance changes!")
+        st.info("🧠 **Smart Mode:** Sorts by date and calculates Paid In/Out from balance changes!")
     else:
         st.info("📋 **Standard Mode:** Extracts all tables and text from the PDF")
     
@@ -285,7 +304,7 @@ with st.container():
             if st.button("🔄 Convert Now", type="primary", use_container_width=True):
                 try:
                     with st.spinner('Converting your PDF...'):
-                        converter = UltraSmartPDFConverter()
+                        converter = FinalSmartPDFConverter()
                         
                         if conversion_mode == 'Smart (Transactions Only)':
                             if output_format == 'Excel':
@@ -382,7 +401,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("""
-    - ✅ Smart balance-based detection
+    - ✅ Smart date-based sorting
     - ✅ Auto-calculates Paid In/Out
     - ✅ Excel & CSV output
     - ✅ Ready-to-use data
