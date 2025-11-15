@@ -145,10 +145,50 @@ class SmartPDFConverter:
         
         return text
     
+    def normalize_transaction_row(self, row: List[str]) -> List[str]:
+        """Normalize a transaction row to standard 6-column format."""
+        # Standard format: Date | Type | Details | Paid In | Paid Out | Balance
+        
+        if len(row) < 4:
+            return row
+        
+        # Start with what we know
+        date = row[0] if len(row) > 0 else ''
+        trans_type = row[1] if len(row) > 1 else ''
+        details = row[2] if len(row) > 2 else ''
+        
+        # Find amounts (last 3 cells typically)
+        amounts = row[3:]  # Everything after details
+        
+        # Filter out empty values
+        amounts = [a for a in amounts if a and str(a).strip()]
+        
+        # Initialize money columns
+        paid_in = ''
+        paid_out = ''
+        balance = ''
+        
+        # The last non-empty amount is always the balance
+        if amounts:
+            balance = amounts[-1]
+            remaining = amounts[:-1]
+            
+            # If there are 1-2 amounts left, they are paid in/paid out
+            if len(remaining) == 1:
+                # Single amount before balance - could be either paid in or paid out
+                # We'll put it in paid out by default (most common)
+                paid_out = remaining[0]
+            elif len(remaining) == 2:
+                # Two amounts: paid in and paid out
+                paid_in = remaining[0]
+                paid_out = remaining[1]
+        
+        return [date, trans_type, details, paid_in, paid_out, balance]
+    
     def extract_smart_transactions(self, pdf_file) -> Tuple[List[str], List[List[str]]]:
         """Extract only transaction rows from PDF."""
         all_rows = []
-        header = None
+        header = ['Date', 'Transaction Type', 'Details', 'Paid In', 'Paid Out', 'Balance']
         
         with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
@@ -172,28 +212,9 @@ class SmartPDFConverter:
                         
                         # Check if it's a transaction
                         if self.is_transaction_row(clean_row):
-                            all_rows.append(clean_row)
-        
-        # Detect header from all extracted rows
-        if all_rows:
-            # Try to find header in the first few rows before actual transactions
-            with pdfplumber.open(pdf_file) as pdf:
-                all_table_rows = []
-                for page in pdf.pages:
-                    tables = page.extract_tables()
-                    for table in tables:
-                        if table:
-                            all_table_rows.extend(table)
-                
-                header = self.detect_header_row(all_table_rows)
-        
-        if not header:
-            # Create header based on the number of columns
-            if all_rows:
-                num_cols = len(all_rows[0])
-                header = [f'Column {i+1}' for i in range(num_cols)]
-            else:
-                header = ['Date', 'Transaction Type', 'Details', 'Paid In', 'Paid Out', 'Balance']
+                            # Normalize to standard 6-column format
+                            normalized_row = self.normalize_transaction_row(clean_row)
+                            all_rows.append(normalized_row)
         
         return header, all_rows
     
