@@ -40,33 +40,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-class FinalSmartPDFConverter:
-    """Smart PDF converter that sorts by DATE and calculates Paid In/Out from balance changes."""
-    
-    def parse_date(self, date_str: str) -> datetime:
-        """Parse date string to datetime for sorting."""
-        if not date_str:
-            return datetime.min
-        
-        date_str = str(date_str).strip()
-        
-        # Try different date formats
-        formats = [
-            '%d-%b-%y',      # 29-Apr-25
-            '%d %b %Y',      # 29 Apr 2025
-            '%d/%m/%Y',      # 29/04/2025
-            '%d/%m/%y',      # 29/04/25
-            '%Y-%m-%d',      # 2025-04-29
-            '%d-%m-%Y',      # 29-04-2025
-        ]
-        
-        for fmt in formats:
-            try:
-                return datetime.strptime(date_str, fmt)
-            except:
-                continue
-        
-        return datetime.min
+class PerfectPDFConverter:
+    """Perfect PDF converter that reads actual Paid In/Out columns from PDF."""
     
     def is_date(self, text: str) -> bool:
         """Check if text looks like a date."""
@@ -91,15 +66,6 @@ class FinalSmartPDFConverter:
             return False
         text = str(text).strip()
         return bool(re.match(r'^[\d,]+\.?\d{0,2}$', text))
-    
-    def clean_amount(self, text: str) -> float:
-        """Convert amount string to float."""
-        if not text or not str(text).strip():
-            return 0.0
-        try:
-            return float(str(text).replace(',', ''))
-        except:
-            return 0.0
     
     def is_transaction_row(self, row: List[str]) -> bool:
         """Determine if a row is a transaction."""
@@ -147,54 +113,40 @@ class FinalSmartPDFConverter:
         text = ' '.join(text.split())
         return text
     
-    def extract_transaction_data(self, row: List[str]) -> Tuple[str, str, str, str]:
-        """Extract date, type, details, and balance from a row."""
-        row = [self.clean_cell(cell) for cell in row]
+    def extract_transaction_from_row(self, row: List[str]) -> List[str]:
+        """Extract transaction data from raw PDF row."""
+        # The PDF structure is:
+        # Col 0: Date
+        # Col 1: Transaction type
+        # Col 2: Details
+        # Col 3: Empty/None
+        # Col 4: Paid in (£)
+        # Col 5: Paid out (£)
+        # Col 6: Balance (£)
         
-        date = row[0] if len(row) > 0 else ''
-        trans_type = row[1] if len(row) > 1 else ''
-        details = row[2] if len(row) > 2 else ''
+        # Ensure we have enough columns
+        while len(row) < 7:
+            row.append('')
         
-        # Find balance (last cell with an amount)
-        balance = ''
-        for i in range(len(row) - 1, 2, -1):
-            if row[i] and self.has_amount(row[i]):
-                balance = row[i]
-                break
+        date = self.clean_cell(row[0])
+        trans_type = self.clean_cell(row[1])
+        details = self.clean_cell(row[2])
+        paid_in = self.clean_cell(row[4]) if len(row) > 4 else ''
+        paid_out = self.clean_cell(row[5]) if len(row) > 5 else ''
+        balance = self.clean_cell(row[6]) if len(row) > 6 else ''
         
-        return date, trans_type, details, balance
-    
-    def calculate_paid_in_out(self, transactions: List[Tuple[str, str, str, str]]) -> List[List[str]]:
-        """Calculate Paid In/Out based on balance changes."""
-        result = []
-        prev_balance = None
+        # If balance is empty, look for it in other positions
+        if not balance:
+            for i in range(len(row) - 1, 2, -1):
+                if row[i] and self.has_amount(str(row[i])):
+                    balance = self.clean_cell(row[i])
+                    break
         
-        for date, trans_type, details, balance_str in transactions:
-            balance = self.clean_amount(balance_str)
-            
-            paid_in = ''
-            paid_out = ''
-            
-            if prev_balance is not None and balance_str:
-                diff = balance - prev_balance
-                
-                if diff > 0:
-                    # Balance increased = Money IN
-                    paid_in = f"{diff:.2f}"
-                elif diff < 0:
-                    # Balance decreased = Money OUT
-                    paid_out = f"{abs(diff):.2f}"
-            
-            result.append([date, trans_type, details, paid_in, paid_out, balance_str])
-            
-            if balance_str:
-                prev_balance = balance
-        
-        return result
+        return [date, trans_type, details, paid_in, paid_out, balance]
     
     def extract_smart_transactions(self, pdf_file) -> Tuple[List[str], List[List[str]]]:
-        """Extract transactions and calculate Paid In/Out from balance changes."""
-        raw_transactions = []
+        """Extract transactions using actual Paid In/Out columns from PDF."""
+        all_transactions = []
         header = ['Date', 'Transaction Type', 'Details', 'Paid In', 'Paid Out', 'Balance']
         
         with pdfplumber.open(pdf_file) as pdf:
@@ -209,22 +161,17 @@ class FinalSmartPDFConverter:
                         if not row:
                             continue
                         
+                        # Skip junk rows
                         clean_row = [self.clean_cell(cell) for cell in row]
-                        
                         if self.is_junk_row(clean_row):
                             continue
                         
+                        # Check if it's a transaction
                         if self.is_transaction_row(clean_row):
-                            date, trans_type, details, balance = self.extract_transaction_data(clean_row)
-                            raw_transactions.append((date, trans_type, details, balance))
+                            transaction = self.extract_transaction_from_row(row)
+                            all_transactions.append(transaction)
         
-        # Sort by DATE (chronologically)
-        raw_transactions.sort(key=lambda x: self.parse_date(x[0]))
-        
-        # Calculate Paid In/Out
-        final_transactions = self.calculate_paid_in_out(raw_transactions)
-        
-        return header, final_transactions
+        return header, all_transactions
     
     def convert_to_csv(self, pdf_file) -> str:
         """Convert PDF to clean CSV."""
@@ -243,7 +190,7 @@ class FinalSmartPDFConverter:
         
         df = pd.DataFrame(transactions, columns=header)
         
-        # Clean up amounts
+        # Clean up amounts (remove commas)
         for col in df.columns:
             if 'paid' in col.lower() or 'balance' in col.lower():
                 df[col] = df[col].str.replace(',', '')
@@ -293,7 +240,7 @@ with st.container():
         )
     
     if conversion_mode == 'Smart (Transactions Only)':
-        st.info("🧠 **Smart Mode:** Sorts by date and calculates Paid In/Out from balance changes!")
+        st.info("🧠 **Smart Mode:** Reads actual Paid In/Out columns from PDF!")
     else:
         st.info("📋 **Standard Mode:** Extracts all tables and text from the PDF")
     
@@ -304,7 +251,7 @@ with st.container():
             if st.button("🔄 Convert Now", type="primary", use_container_width=True):
                 try:
                     with st.spinner('Converting your PDF...'):
-                        converter = FinalSmartPDFConverter()
+                        converter = PerfectPDFConverter()
                         
                         if conversion_mode == 'Smart (Transactions Only)':
                             if output_format == 'Excel':
@@ -401,8 +348,8 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("""
-    - ✅ Smart date-based sorting
-    - ✅ Auto-calculates Paid In/Out
+    - ✅ Reads actual PDF columns
+    - ✅ No calculation needed
     - ✅ Excel & CSV output
     - ✅ Ready-to-use data
     """)
@@ -411,7 +358,7 @@ with col2:
     st.markdown("""
     - ✅ Bank statement friendly
     - ✅ No manual cleanup needed
-    - ✅ Perfect accuracy
+    - ✅ 100% accurate
     - ✅ Instant download
     """)
 
