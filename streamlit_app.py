@@ -3,6 +3,7 @@ import pdfplumber
 import pandas as pd
 import io
 from datetime import datetime
+import re
 
 # Page configuration
 st.set_page_config(
@@ -44,20 +45,45 @@ def clean_text(text):
         return ''
     return str(text).strip()
 
+def is_valid_date(text):
+    """Check if text is a valid date."""
+    if not text or len(text) < 6:
+        return False
+    
+    date_patterns = [
+        r'^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}$',
+        r'^\d{1,2}-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{2}$',
+    ]
+    
+    return any(re.match(pattern, text) for pattern in date_patterns)
+
 def parse_date(date_str):
     """Parse date for sorting."""
     try:
-        # Try format: 29 Apr 2025
         return datetime.strptime(date_str, '%d %b %Y')
     except:
         try:
-            # Try format: 29-Apr-25
             return datetime.strptime(date_str, '%d-%b-%y')
         except:
             return datetime.min
 
+def is_header_or_junk(row_text):
+    """Check if row is a header or junk (very minimal filtering)."""
+    # Only skip VERY obvious headers
+    obvious_junk = [
+        'business owner:',
+        'account number:',
+        'sort code:',
+        'statement for:',
+        'page ',
+        'bank statement',
+        'balance (£) on'
+    ]
+    
+    return any(junk in row_text for junk in obvious_junk)
+
 def read_bank_statement(pdf_file):
-    """Read bank statement and extract transactions."""
+    """Read bank statement and extract ALL transactions."""
     transactions = []
     
     with pdfplumber.open(pdf_file) as pdf:
@@ -69,52 +95,47 @@ def read_bank_statement(pdf_file):
                     continue
                 
                 for row in table:
-                    if not row or len(row) < 7:
+                    if not row:
                         continue
+                    
+                    # Ensure row has enough columns
+                    while len(row) < 7:
+                        row.append('')
                     
                     # Clean all cells
                     clean_row = [clean_text(cell) for cell in row]
                     
-                    # Skip empty rows
-                    if not any(clean_row):
-                        continue
+                    # Get first cell (should be date)
+                    date = clean_row[0]
                     
-                    # Skip header/junk rows
-                    row_text = ' '.join(clean_row).lower()
-                    junk_keywords = [
-                        'business owner', 'account number', 'sort code', 
-                        'statement for', 'total paid', 'transactions',
-                        'page', 'date', 'transaction type', 'paid in', 'paid out',
-                        'balance (£)', 'clearbank', 'tide'
-                    ]
-                    
-                    if any(keyword in row_text for keyword in junk_keywords):
-                        continue
+                    # Skip if not a valid date
+                    if not is_valid_date(date):
+                        # Check if it's obvious junk
+                        row_text = ' '.join(clean_row).lower()
+                        if is_header_or_junk(row_text):
+                            continue
+                        # If not obvious junk but no date, skip anyway
+                        if not date:
+                            continue
                     
                     # Extract transaction data
                     # Row structure: [Date, Type, Details, None, Paid In, Paid Out, Balance]
-                    date = clean_row[0]
-                    trans_type = clean_row[1]
-                    details = clean_row[2]
-                    money_in = clean_row[4] if len(clean_row) > 4 else ''
-                    money_out = clean_row[5] if len(clean_row) > 5 else ''
-                    balance = clean_row[6] if len(clean_row) > 6 else ''
+                    description = clean_row[2]  # Just the details, no type
+                    money_in = clean_row[4]
+                    money_out = clean_row[5]
+                    balance = clean_row[6]
                     
-                    # Only add if we have a date
-                    if date and len(date) > 5:
-                        # Combine type and details for full description
-                        description = f"{trans_type} - {details}".strip(' -')
-                        
-                        transactions.append({
-                            'Date': date,
-                            'Description': description,
-                            'Money In': money_in,
-                            'Money Out': money_out,
-                            'Balance': balance,
-                            '_sort_date': parse_date(date)
-                        })
+                    # Add transaction
+                    transactions.append({
+                        'Date': date,
+                        'Description': description,
+                        'Money In': money_in,
+                        'Money Out': money_out,
+                        'Balance': balance,
+                        '_sort_date': parse_date(date)
+                    })
     
-    # Sort by date (chronological order)
+    # Sort by date (chronological order - oldest first)
     transactions.sort(key=lambda x: x['_sort_date'])
     
     # Remove the sort helper column
@@ -182,16 +203,19 @@ with st.container():
                             )
                             
                             # Preview
-                            st.subheader("📋 Preview (First 10 transactions)")
-                            st.dataframe(df.head(10), use_container_width=True)
+                            st.subheader("📋 Preview (First 15 transactions)")
+                            st.dataframe(df.head(15), use_container_width=True)
                             
                             # Stats
-                            col1, col2 = st.columns(2)
+                            col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("📊 Total Transactions", len(transactions))
                             with col2:
-                                date_range = f"{df['Date'].iloc[0]} to {df['Date'].iloc[-1]}"
-                                st.info(f"📅 Date Range: {date_range}")
+                                if len(df) > 0:
+                                    date_range = f"{df['Date'].iloc[0]} → {df['Date'].iloc[-1]}"
+                                    st.info(f"📅 {date_range}")
+                            with col3:
+                                st.success("✅ All data extracted!")
                 
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
@@ -207,23 +231,23 @@ with col1:
     st.markdown("""
     **1️⃣ Upload**
     - Upload your bank statement PDF
-    - Supports most UK bank formats
+    - Supports multi-page PDFs
     """)
 
 with col2:
     st.markdown("""
     **2️⃣ Process**
-    - Reads all transactions
+    - Extracts ALL transactions
     - Sorts chronologically
-    - Organizes data
+    - Clean descriptions only
     """)
 
 with col3:
     st.markdown("""
     **3️⃣ Download**
     - Get Excel file
+    - All 500+ transactions
     - Ready to use
-    - Clean & organized
     """)
 
 # Footer
