@@ -70,7 +70,6 @@ def is_header_row(clean_row):
     """Check if row is a header."""
     row_text = ' '.join(clean_row).lower()
     
-    # Header keywords
     header_keywords = [
         'date', 'transaction type', 'details', 'paid in', 'paid out', 
         'balance', 'business owner', 'account number', 'sort code',
@@ -81,7 +80,7 @@ def is_header_row(clean_row):
     return any(keyword in row_text for keyword in header_keywords)
 
 def read_statement(pdf_file):
-    """Read PDF and extract exactly 4 columns: Date, Description, Money In, Money Out."""
+    """Read PDF - CORRECT column mapping."""
     transactions = []
     
     with pdfplumber.open(pdf_file) as pdf:
@@ -93,7 +92,7 @@ def read_statement(pdf_file):
                     continue
                 
                 for row in table:
-                    if not row or len(row) < 5:
+                    if not row or len(row) < 6:
                         continue
                     
                     # Clean the row
@@ -110,16 +109,17 @@ def read_statement(pdf_file):
                     if not is_valid_date(date):
                         continue
                     
-                    # Extract columns based on Tide bank statement structure:
+                    # CORRECT MAPPING based on PDF structure:
                     # Column 0 = Date
-                    # Column 1 = Transaction type (SKIP THIS)
-                    # Column 2 = Details (THIS IS THE DESCRIPTION WE WANT)
-                    # Column 3 = Paid in (£)
-                    # Column 4 = Paid out (£)
+                    # Column 1 = Transaction type (skip)
+                    # Column 2 = Details (description)
+                    # Column 3 = Paid in (£) - THIS IS MONEY IN
+                    # Column 4 = Paid out (£) - THIS IS MONEY OUT
+                    # Column 5 = Balance (£) - skip
                     
                     description = clean_row[2] if len(clean_row) > 2 else ''
-                    money_in = clean_row[3] if len(clean_row) > 3 else ''
-                    money_out = clean_row[4] if len(clean_row) > 4 else ''
+                    money_in = clean_row[3] if len(clean_row) > 3 else ''   # PAID IN
+                    money_out = clean_row[4] if len(clean_row) > 4 else ''  # PAID OUT
                     
                     # Only add if we have a description
                     if description:
@@ -174,8 +174,8 @@ with st.container():
                             ws = writer.sheets['Transactions']
                             ws.column_dimensions['A'].width = 15  # Date
                             ws.column_dimensions['B'].width = 70  # Description
-                            ws.column_dimensions['C'].width = 12  # Money In
-                            ws.column_dimensions['D'].width = 12  # Money Out
+                            ws.column_dimensions['C'].width = 15  # Money In
+                            ws.column_dimensions['D'].width = 15  # Money Out
                         
                         excel_data = output.getvalue()
                         
@@ -208,8 +208,8 @@ with col1:
     **Clean Data**
     - Date
     - Full Description
-    - Money In
-    - Money Out
+    - Money In (Paid in)
+    - Money Out (Paid out)
     """)
 
 with col2:
@@ -217,5 +217,5 @@ with col2:
     **100% Accurate**
     - All transactions
     - Chronological order
-    - One header only
+    - Correct columns
     """)
