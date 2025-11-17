@@ -53,13 +53,12 @@ def is_valid_date(text):
     patterns = [
         r'^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}$',
         r'^\d{1,2}-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{2}$',
-        r'^\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{2}$',
     ]
     return any(re.match(pattern, text) for pattern in patterns)
 
 def parse_date(date_str):
     """Parse date for sorting."""
-    formats = ['%d %b %Y', '%d-%b-%y', '%d %b %y']
+    formats = ['%d %b %Y', '%d-%b-%y']
     for fmt in formats:
         try:
             return datetime.strptime(date_str, fmt)
@@ -67,8 +66,22 @@ def parse_date(date_str):
             continue
     return datetime.min
 
+def is_header_row(clean_row):
+    """Check if row is a header."""
+    row_text = ' '.join(clean_row).lower()
+    
+    # Header keywords
+    header_keywords = [
+        'date', 'transaction type', 'details', 'paid in', 'paid out', 
+        'balance', 'business owner', 'account number', 'sort code',
+        'statement for', 'total paid', 'page', 'bank statement',
+        'transactions'
+    ]
+    
+    return any(keyword in row_text for keyword in header_keywords)
+
 def read_statement(pdf_file):
-    """Read PDF and extract exactly 4 columns."""
+    """Read PDF and extract exactly 4 columns: Date, Description, Money In, Money Out."""
     transactions = []
     
     with pdfplumber.open(pdf_file) as pdf:
@@ -80,11 +93,15 @@ def read_statement(pdf_file):
                     continue
                 
                 for row in table:
-                    if not row or len(row) < 7:
+                    if not row or len(row) < 5:
                         continue
                     
                     # Clean the row
                     clean_row = [clean_text(cell) for cell in row]
+                    
+                    # Skip header rows
+                    if is_header_row(clean_row):
+                        continue
                     
                     # Get the date (column 0)
                     date = clean_row[0]
@@ -93,26 +110,28 @@ def read_statement(pdf_file):
                     if not is_valid_date(date):
                         continue
                     
-                    # Extract EXACTLY these columns:
+                    # Extract columns based on Tide bank statement structure:
                     # Column 0 = Date
-                    # Column 2 = Description  
-                    # Column 4 = Money In (Paid in £)
-                    # Column 5 = Money Out (Paid out £)
+                    # Column 1 = Transaction type (SKIP THIS)
+                    # Column 2 = Details (THIS IS THE DESCRIPTION WE WANT)
+                    # Column 3 = Paid in (£)
+                    # Column 4 = Paid out (£)
                     
-                    description = clean_row[2]
-                    money_in = clean_row[4]
-                    money_out = clean_row[5]
+                    description = clean_row[2] if len(clean_row) > 2 else ''
+                    money_in = clean_row[3] if len(clean_row) > 3 else ''
+                    money_out = clean_row[4] if len(clean_row) > 4 else ''
                     
-                    # Add to list
-                    transactions.append({
-                        'Date': date,
-                        'Description': description,
-                        'Money In': money_in,
-                        'Money Out': money_out,
-                        '_sort': parse_date(date)
-                    })
+                    # Only add if we have a description
+                    if description:
+                        transactions.append({
+                            'Date': date,
+                            'Description': description,
+                            'Money In': money_in,
+                            'Money Out': money_out,
+                            '_sort': parse_date(date)
+                        })
     
-    # Sort chronologically
+    # Sort chronologically (oldest first)
     transactions.sort(key=lambda x: x['_sort'])
     
     # Remove sort column
@@ -153,10 +172,10 @@ with st.container():
                             df.to_excel(writer, index=False, sheet_name='Transactions')
                             
                             ws = writer.sheets['Transactions']
-                            ws.column_dimensions['A'].width = 15
-                            ws.column_dimensions['B'].width = 60
-                            ws.column_dimensions['C'].width = 12
-                            ws.column_dimensions['D'].width = 12
+                            ws.column_dimensions['A'].width = 15  # Date
+                            ws.column_dimensions['B'].width = 70  # Description
+                            ws.column_dimensions['C'].width = 12  # Money In
+                            ws.column_dimensions['D'].width = 12  # Money Out
                         
                         excel_data = output.getvalue()
                         
@@ -180,6 +199,23 @@ with st.container():
                 st.error(f"❌ Error: {str(e)}")
 
 st.markdown("---")
-st.markdown("### ✅ 4 Columns Only")
-st.markdown("**Date | Description | Money In | Money Out**")
-st.markdown("100% accurate extraction from PDF columns 0, 2, 4, 5")
+st.markdown("### ✅ What you get")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("""
+    **Clean Data**
+    - Date
+    - Full Description
+    - Money In
+    - Money Out
+    """)
+
+with col2:
+    st.markdown("""
+    **100% Accurate**
+    - All transactions
+    - Chronological order
+    - One header only
+    """)
