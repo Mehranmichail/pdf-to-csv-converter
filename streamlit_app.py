@@ -926,6 +926,11 @@ html_content = """
             
             html += '</tbody></table></div>';
             
+            // Add explanatory note
+            html += `<p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; font-size: 12px; color: #1565C0;">
+                ℹ️ <strong>Note:</strong> This Trial Balance represents the movement in cash during the period based on transactions in the bank statement. It does not include opening balances.
+            </p>`;
+            
             // Check if balanced
             const difference = Math.abs(totalDebit - totalCredit);
             if (difference < 0.01) {
