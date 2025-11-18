@@ -896,17 +896,23 @@ html_content = """
             let totalDebit = 0;
             let totalCredit = 0;
             
-            // Calculate opening and closing balance
-            const openingBalance = extractedData.length > 0 ? 
-                parseFloat(extractedData[0]['Balance (£)']) - 
-                (parseFloat(extractedData[0]['Paid in (£)']) || 0) + 
-                (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
+            // Get the actual opening balance from the first transaction
+            let openingBalance = 0;
+            if (extractedData.length > 0) {
+                const firstTransaction = extractedData[0];
+                const firstBalance = parseFloat(firstTransaction['Balance (£)']);
+                const firstPaidIn = parseFloat(firstTransaction['Paid in (£)']) || 0;
+                const firstPaidOut = parseFloat(firstTransaction['Paid out (£)']) || 0;
+                openingBalance = firstBalance - firstPaidIn + firstPaidOut;
+            }
+            
+            // Get closing balance
             const closingBalance = extractedData.length > 0 ? 
                 parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
             
             // Bank Account (Asset - Debit balance)
             html += `<tr>
-                <td><strong>Bank Account</strong></td>
+                <td><strong>Bank Account (Closing)</strong></td>
                 <td style="text-align: right;">${closingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>-</td>
             </tr>`;
@@ -938,16 +944,29 @@ html_content = """
                 </tr>`;
             });
             
-            // Capital/Equity (to balance the books)
-            // Capital = Opening Balance + Net Profit
-            const netProfit = totalCredit - totalDebit + closingBalance;
+            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
+            
+            // Calculate total income and expenses
+            let totalIncome = 0;
+            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
+            
+            let totalExpenses = 0;
+            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
+            
+            // Net Profit/Loss for the period
+            const netProfit = totalIncome - totalExpenses;
+            
+            // Capital/Equity = Opening Balance + Net Profit
             const capital = openingBalance + netProfit;
             
-            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
             html += `<tr>
                 <td><strong>Capital/Equity</strong></td>
                 <td>-</td>
                 <td style="text-align: right;">${capital.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            html += `<tr style="font-size: 11px; color: #666;">
+                <td style="padding-left: 20px;">Opening Balance: £${openingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td colspan="2" style="padding-left: 20px;">Net Profit: £${netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>`;
             totalCredit += capital;
             
@@ -1133,17 +1152,22 @@ html_content = """
             let totalDebit = 0;
             let totalCredit = 0;
             
-            // Calculate balances
-            const openingBalance = extractedData.length > 0 ? 
-                parseFloat(extractedData[0]['Balance (£)']) - 
-                (parseFloat(extractedData[0]['Paid in (£)']) || 0) + 
-                (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
+            // Get actual opening balance
+            let openingBalance = 0;
+            if (extractedData.length > 0) {
+                const firstTransaction = extractedData[0];
+                const firstBalance = parseFloat(firstTransaction['Balance (£)']);
+                const firstPaidIn = parseFloat(firstTransaction['Paid in (£)']) || 0;
+                const firstPaidOut = parseFloat(firstTransaction['Paid out (£)']) || 0;
+                openingBalance = firstBalance - firstPaidIn + firstPaidOut;
+            }
+            
             const closingBalance = extractedData.length > 0 ? 
                 parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
             
             // Bank Account (Asset - Debit)
             trialBalanceData.push({
-                'Account': 'Bank Account',
+                'Account': 'Bank Account (Closing)',
                 'Debit (£)': closingBalance.toFixed(2),
                 'Credit (£)': ''
             });
@@ -1189,14 +1213,28 @@ html_content = """
                 'Credit (£)': ''
             });
             
-            // Capital/Equity (to balance)
-            const netProfit = totalCredit - totalDebit + closingBalance;
+            // Calculate total income and expenses
+            let totalIncome = 0;
+            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
+            
+            let totalExpenses = 0;
+            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
+            
+            // Net Profit/Loss
+            const netProfit = totalIncome - totalExpenses;
+            
+            // Capital/Equity = Opening Balance + Net Profit
             const capital = openingBalance + netProfit;
             
             trialBalanceData.push({
                 'Account': 'Capital/Equity',
                 'Debit (£)': '',
                 'Credit (£)': capital.toFixed(2)
+            });
+            trialBalanceData.push({
+                'Account': `  Opening Balance: £${openingBalance.toFixed(2)} + Net Profit: £${netProfit.toFixed(2)}`,
+                'Debit (£)': '',
+                'Credit (£)': ''
             });
             totalCredit += capital;
             
@@ -1216,7 +1254,7 @@ html_content = """
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Trial Balance');
             
-            ws['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 15 }];
+            ws['!cols'] = [{ wch: 50 }, { wch: 15 }, { wch: 15 }];
             
             const now = new Date();
             const filename = `trial_balance_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
