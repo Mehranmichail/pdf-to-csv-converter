@@ -1,147 +1,611 @@
-import streamlit as st
-import pdfplumber
-import pandas as pd
-import io
-from datetime import datetime
-import re
-
-st.set_page_config(page_title="Bank Statement to Excel", page_icon="🏦", layout="centered")
-
-st.markdown("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Statement PDF to Excel Converter</title>
     <style>
-    .main { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; }
-    h1 { color: white; text-align: center; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-section.dragover {
+            border-color: #4CAF50;
+            background: #e8f5e9;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .upload-section h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .upload-section p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .progress-bar-container {
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 30px;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-message {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f8ff;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .error-message {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            border-radius: 5px;
+            color: #c62828;
+        }
+
+        .preview-table {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .download-btn {
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 12px;
+            background: #f8f9fa;
+        }
     </style>
-    """, unsafe_allow_html=True)
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Bank Statement Converter</h1>
+            <p>Convert your Tide Bank PDF statements to Excel format instantly</p>
+        </div>
 
-def is_valid_date(text):
-    """Check if text is a date like '31 Aug 2024'"""
-    if not text:
-        return False
-    pattern = r'^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}$'
-    return bool(re.match(pattern, str(text).strip()))
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📄</div>
+                <h3>Drop your PDF file here</h3>
+                <p>or click to browse</p>
+                <input type="file" id="fileInput" accept=".pdf">
+                <button class="btn" onclick="document.getElementById('fileInput').click()">
+                    Select PDF File
+                </button>
+            </div>
 
-def parse_date(date_str):
-    """Parse date for sorting"""
-    try:
-        return datetime.strptime(str(date_str).strip(), '%d %b %Y')
-    except:
-        return datetime.min
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">0%</div>
+                </div>
+                <div class="status-message" id="statusMessage">Processing...</div>
+            </div>
 
-def read_pdf_statement(pdf_file):
-    """Read PDF and extract all transaction rows"""
-    transactions = []
-    
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            # Extract table from page
-            table = page.extract_table()
-            
-            if not table:
-                continue
-            
-            for row in table:
-                if not row or len(row) < 6:
-                    continue
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="result-section" id="resultSection">
+                <h3>✅ Conversion Successful!</h3>
                 
-                # Get first column
-                col0 = str(row[0]).strip() if row[0] else ''
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="label">Total Transactions</div>
+                        <div class="value" id="totalTransactions">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Total Paid In</div>
+                        <div class="value" style="color: #4CAF50;" id="totalPaidIn">£0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Total Paid Out</div>
+                        <div class="value" style="color: #f44336;" id="totalPaidOut">£0.00</div>
+                    </div>
+                </div>
+
+                <button class="btn download-btn" id="downloadBtn">
+                    📥 Download Excel File
+                </button>
+
+                <div class="preview-table">
+                    <h4 style="margin-bottom: 10px; color: #667eea;">Preview (First 10 rows)</h4>
+                    <table id="previewTable"></table>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Supports Tide Bank statement PDFs | Data processed locally in your browser</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // Set up PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let extractedData = [];
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const progressSection = document.getElementById('progressSection');
+        const resultSection = document.getElementById('resultSection');
+        const errorMessage = document.getElementById('errorMessage');
+        const progressBar = document.getElementById('progressBar');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Drag and drop
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') {
+                processPDF(file);
+            } else {
+                showError('Please upload a valid PDF file');
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                processPDF(file);
+            }
+        });
+
+        async function processPDF(file) {
+            try {
+                hideError();
+                resultSection.style.display = 'none';
+                progressSection.style.display = 'block';
+                updateProgress(10, 'Reading PDF file...');
+
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
                 
-                # Only process if first column is a valid date
-                if is_valid_date(col0):
-                    # Extract all 6 columns as-is
-                    date = col0
-                    transaction_type = str(row[1]).strip() if row[1] else ''
-                    details = str(row[2]).strip() if row[2] else ''
-                    paid_in = str(row[3]).strip() if row[3] else ''
-                    paid_out = str(row[4]).strip() if row[4] else ''
-                    balance = str(row[5]).strip() if row[5] else ''
+                updateProgress(30, `Processing ${pdf.numPages} pages...`);
+
+                extractedData = [];
+
+                // Read all pages and extract text
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const textContent = await page.getTextContent();
                     
-                    # Add transaction
-                    transactions.append({
-                        'Date': date,
-                        'Transaction type': transaction_type,
-                        'Details': details,
-                        'Paid in (£)': paid_in,
-                        'Paid out (£)': paid_out,
-                        'Balance (£)': balance,
-                        '_sort': parse_date(date)
-                    })
-    
-    # Sort by date (oldest first)
-    transactions.sort(key=lambda x: x['_sort'])
-    
-    # Remove sort helper
-    for t in transactions:
-        del t['_sort']
-    
-    return transactions
+                    // Extract text items with positions
+                    const items = textContent.items.map(item => ({
+                        text: item.str.trim(),
+                        x: Math.round(item.transform[4]),
+                        y: Math.round(item.transform[5]),
+                        height: Math.round(item.height)
+                    }));
 
-# UI
-st.markdown("<h1>🏦 Bank Statement to Excel</h1>", unsafe_allow_html=True)
-
-uploaded_file = st.file_uploader("📄 Upload PDF", type=['pdf'])
-
-if uploaded_file:
-    st.success(f"✅ {uploaded_file.name}")
-    
-    if st.button("📊 Extract to Excel", type="primary", use_container_width=True):
-        with st.spinner('Reading PDF...'):
-            try:
-                # Extract transactions
-                transactions = read_pdf_statement(uploaded_file)
-                
-                if not transactions:
-                    st.error("❌ No transactions found")
-                else:
-                    # Create DataFrame
-                    df = pd.DataFrame(transactions)
+                    // Group items by Y position (same line)
+                    const lines = groupIntoLines(items);
                     
-                    # Create Excel file
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, index=False, sheet_name='Transactions')
+                    // Extract table data from lines
+                    extractTableData(lines);
+                    
+                    const progress = 30 + (pageNum / pdf.numPages) * 60;
+                    updateProgress(progress, `Processing page ${pageNum} of ${pdf.numPages}...`);
+                }
+
+                updateProgress(95, 'Finalizing...');
+
+                if (extractedData.length === 0) {
+                    throw new Error('No transactions found. Please check if this is a valid Tide Bank statement.');
+                }
+
+                updateProgress(100, 'Complete!');
+                displayResults();
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error processing PDF: ' + error.message);
+                progressSection.style.display = 'none';
+            }
+        }
+
+        function groupIntoLines(items) {
+            // Sort by Y position (top to bottom)
+            items.sort((a, b) => b.y - a.y);
+            
+            const lines = [];
+            let currentLine = [];
+            let currentY = null;
+            const yThreshold = 5; // Items within 5px are on same line
+            
+            items.forEach(item => {
+                if (item.text === '') return;
+                
+                if (currentY === null || Math.abs(item.y - currentY) <= yThreshold) {
+                    currentLine.push(item);
+                    currentY = item.y;
+                } else {
+                    if (currentLine.length > 0) {
+                        // Sort line items by X position (left to right)
+                        currentLine.sort((a, b) => a.x - b.x);
+                        lines.push(currentLine);
+                    }
+                    currentLine = [item];
+                    currentY = item.y;
+                }
+            });
+            
+            if (currentLine.length > 0) {
+                currentLine.sort((a, b) => a.x - b.x);
+                lines.push(currentLine);
+            }
+            
+            return lines;
+        }
+
+        function extractTableData(lines) {
+            for (let line of lines) {
+                const lineText = line.map(item => item.text).join(' ');
+                
+                // Check if this line contains a date (transaction line)
+                const dateMatch = lineText.match(/^(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/);
+                
+                if (dateMatch) {
+                    // This is a transaction row
+                    const date = dateMatch[1];
+                    
+                    // Get all text from the line
+                    const allText = line.map(item => item.text);
+                    
+                    // Find transaction type
+                    let transType = '';
+                    let transTypeIndex = -1;
+                    const types = ['Card Transaction Refund', 'Card Transaction', 'Domestic Transfer', 'Direct Debit', 'Fee'];
+                    
+                    for (let type of types) {
+                        const idx = allText.findIndex(t => t.includes(type.split(' ')[0]));
+                        if (idx !== -1) {
+                            // Check if full type matches
+                            const checkText = allText.slice(idx, idx + type.split(' ').length).join(' ');
+                            if (checkText.includes(type)) {
+                                transType = type;
+                                transTypeIndex = idx;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!transType) continue;
+                    
+                    // Find all numbers (amounts)
+                    const numbers = [];
+                    for (let i = 0; i < allText.length; i++) {
+                        const text = allText[i].replace(/,/g, '');
+                        if (/^\d+\.\d{2}$/.test(text)) {
+                            numbers.push({ value: text, index: i });
+                        }
+                    }
+                    
+                    if (numbers.length < 2) continue; // Need at least transaction amount and balance
+                    
+                    // Last number is always balance
+                    const balance = numbers[numbers.length - 1].value;
+                    
+                    // Determine Paid In and Paid Out
+                    let paidIn = '';
+                    let paidOut = '';
+                    
+                    if (numbers.length === 3) {
+                        // Three columns: Paid In, Paid Out, Balance
+                        paidIn = numbers[0].value;
+                        paidOut = numbers[1].value;
+                    } else if (numbers.length === 2) {
+                        // Two columns: either (Paid In, Balance) or (Paid Out, Balance)
+                        const amount = numbers[0].value;
                         
-                        ws = writer.sheets['Transactions']
-                        ws.column_dimensions['A'].width = 15  # Date
-                        ws.column_dimensions['B'].width = 20  # Transaction type
-                        ws.column_dimensions['C'].width = 70  # Details
-                        ws.column_dimensions['D'].width = 15  # Paid in
-                        ws.column_dimensions['E'].width = 15  # Paid out
-                        ws.column_dimensions['F'].width = 15  # Balance
+                        // Determine if it's income or expense
+                        const detailsText = allText.join(' ').toLowerCase();
+                        const isIncome = transType === 'Card Transaction Refund' || 
+                                       (transType === 'Domestic Transfer' && (
+                                           detailsText.includes('sumup') ||
+                                           detailsText.includes('paymentsense') ||
+                                           detailsText.includes('evo payments') ||
+                                           detailsText.includes('dojo') ||
+                                           detailsText.includes('american express')
+                                       ));
+                        
+                        if (isIncome) {
+                            paidIn = amount;
+                        } else {
+                            paidOut = amount;
+                        }
+                    }
                     
-                    excel_data = output.getvalue()
+                    // Extract details (everything between trans type and numbers)
+                    let details = [];
+                    for (let i = transTypeIndex + 1; i < numbers[0].index; i++) {
+                        if (allText[i] && !allText[i].includes('Tide Card') && allText[i] !== '****') {
+                            details.push(allText[i]);
+                        }
+                    }
+                    const detailsStr = details.join(' ').replace(/\s+/g, ' ').trim();
                     
-                    st.success(f'✅ Extracted {len(transactions)} transactions')
-                    
-                    # Download button
-                    st.download_button(
-                        label="⬇️ Download Excel",
-                        data=excel_data,
-                        file_name="transactions.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        type="primary",
-                        use_container_width=True
-                    )
-                    
-                    # Preview
-                    st.subheader("📋 Preview (first 30 rows)")
-                    st.dataframe(df.head(30), use_container_width=True)
-                    
-                    st.metric("📊 Total Transactions", len(transactions))
-                    
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+                    // Add transaction
+                    extractedData.push({
+                        'Date': date,
+                        'Transaction type': transType,
+                        'Details': detailsStr,
+                        'Paid in (£)': paidIn,
+                        'Paid out (£)': paidOut,
+                        'Balance (£)': balance
+                    });
+                }
+            }
+        }
 
-st.markdown("---")
-st.markdown("""
-### 📝 Columns Extracted:
-- Date
-- Transaction type
-- Details
-- Paid in (£)
-- Paid out (£)
-- Balance (£)
-""")
+        function displayResults() {
+            progressSection.style.display = 'none';
+            resultSection.style.display = 'block';
+
+            // Calculate totals
+            let totalPaidIn = 0;
+            let totalPaidOut = 0;
+
+            extractedData.forEach(row => {
+                if (row['Paid in (£)']) {
+                    totalPaidIn += parseFloat(row['Paid in (£)']);
+                }
+                if (row['Paid out (£)']) {
+                    totalPaidOut += parseFloat(row['Paid out (£)']);
+                }
+            });
+
+            document.getElementById('totalTransactions').textContent = extractedData.length;
+            document.getElementById('totalPaidIn').textContent = '£' + totalPaidIn.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('totalPaidOut').textContent = '£' + totalPaidOut.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            // Display preview table
+            const previewTable = document.getElementById('previewTable');
+            let tableHTML = '<thead><tr>';
+            const headers = ['Date', 'Transaction type', 'Details', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
+            headers.forEach(header => {
+                tableHTML += `<th>${header}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+
+            extractedData.slice(0, 10).forEach(row => {
+                tableHTML += '<tr>';
+                headers.forEach(header => {
+                    const value = row[header] || '';
+                    tableHTML += `<td>${value}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+            tableHTML += '</tbody>';
+            previewTable.innerHTML = tableHTML;
+        }
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            // Create workbook
+            const ws = XLSX.utils.json_to_sheet(extractedData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+
+            // Auto-size columns
+            const colWidths = [
+                { wch: 15 }, // Date
+                { wch: 20 }, // Transaction type
+                { wch: 60 }, // Details
+                { wch: 15 }, // Paid in
+                { wch: 15 }, // Paid out
+                { wch: 15 }  // Balance
+            ];
+            ws['!cols'] = colWidths;
+
+            // Generate filename
+            const now = new Date();
+            const filename = `bank_statement_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+
+            // Download
+            XLSX.writeFile(wb, filename);
+        });
+
+        function updateProgress(percent, message) {
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = Math.round(percent) + '%';
+            statusMessage.textContent = message;
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
