@@ -333,7 +333,7 @@ html_content = """
     <div class="container">
         <div class="header">
             <h1>🏦 Bank Statement Converter</h1>
-            <p>Convert your Tide Bank PDF statements to Excel with automatic categorization</p>
+            <p>Convert your bank PDF statements to Excel with automatic categorization</p>
         </div>
 
         <div class="content">
@@ -404,7 +404,7 @@ html_content = """
         </div>
 
         <div class="footer">
-            <p>Supports Tide Bank statement PDFs | Data processed locally in your browser | Automatic categorization included</p>
+            <p>Supports bank statement PDFs | Data processed locally in your browser | Automatic categorization included</p>
         </div>
     </div>
 
