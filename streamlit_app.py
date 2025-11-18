@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 # Set page config
 st.set_page_config(page_title="Bank Statement Converter", page_icon="🏦", layout="wide")
 
-# HTML content
+# HTML content with categorization feature
 html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -27,7 +27,7 @@ html_content = """
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -153,13 +153,17 @@ html_content = """
         .result-section {
             display: none;
             margin-top: 30px;
-            padding: 20px;
-            background: #f0f8ff;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
         }
 
-        .result-section h3 {
+        .result-header {
+            background: #f0f8ff;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 20px;
+        }
+
+        .result-header h3 {
             color: #667eea;
             margin-bottom: 15px;
         }
@@ -188,6 +192,82 @@ html_content = """
             font-size: 24px;
             font-weight: 700;
             color: #667eea;
+        }
+
+        .category-summary {
+            margin-top: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .category-summary h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .category-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .category-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .category-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .category-content {
+            display: none;
+        }
+
+        .category-content.active {
+            display: block;
+        }
+
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .category-item:hover {
+            background: #f8f9ff;
+        }
+
+        .category-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .category-amount {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .category-amount.income {
+            color: #4CAF50;
+        }
+
+        .category-amount.expense {
+            color: #f44336;
         }
 
         .error-message {
@@ -239,13 +319,21 @@ html_content = """
             font-size: 12px;
             background: #f8f9fa;
         }
+
+        .chart-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🏦 Bank Statement Converter</h1>
-            <p>Convert your Tide Bank PDF statements to Excel format instantly</p>
+            <p>Convert your Tide Bank PDF statements to Excel with automatic categorization</p>
         </div>
 
         <div class="content">
@@ -269,36 +357,54 @@ html_content = """
             <div class="error-message" id="errorMessage"></div>
 
             <div class="result-section" id="resultSection">
-                <h3>✅ Conversion Successful!</h3>
-                
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="label">Total Transactions</div>
-                        <div class="value" id="totalTransactions">0</div>
+                <div class="result-header">
+                    <h3>✅ Conversion Successful!</h3>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="label">Total Transactions</div>
+                            <div class="value" id="totalTransactions">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Paid In</div>
+                            <div class="value" style="color: #4CAF50;" id="totalPaidIn">£0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Paid Out</div>
+                            <div class="value" style="color: #f44336;" id="totalPaidOut">£0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Categories Found</div>
+                            <div class="value" id="totalCategories">0</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="label">Total Paid In</div>
-                        <div class="value" style="color: #4CAF50;" id="totalPaidIn">£0.00</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="label">Total Paid Out</div>
-                        <div class="value" style="color: #f44336;" id="totalPaidOut">£0.00</div>
-                    </div>
+
+                    <button class="btn download-btn" id="downloadBtn">
+                        📥 Download Excel File with Categories
+                    </button>
                 </div>
 
-                <button class="btn download-btn" id="downloadBtn">
-                    📥 Download Excel File
-                </button>
+                <div class="category-summary">
+                    <h3>📊 Receipts & Payments by Category</h3>
+                    
+                    <div class="category-tabs">
+                        <button class="category-tab active" onclick="switchTab('income')">Money In (Receipts)</button>
+                        <button class="category-tab" onclick="switchTab('expenses')">Money Out (Payments)</button>
+                    </div>
+
+                    <div id="incomeCategories" class="category-content active"></div>
+                    <div id="expenseCategories" class="category-content"></div>
+                </div>
 
                 <div class="preview-table">
-                    <h4 style="margin-bottom: 10px; color: #667eea;">Preview (First 10 rows)</h4>
+                    <h4 style="margin-bottom: 10px; color: #667eea;">Transaction Preview (First 10 rows)</h4>
                     <table id="previewTable"></table>
                 </div>
             </div>
         </div>
 
         <div class="footer">
-            <p>Supports Tide Bank statement PDFs | Data processed locally in your browser</p>
+            <p>Supports Tide Bank statement PDFs | Data processed locally in your browser | Automatic categorization included</p>
         </div>
     </div>
 
@@ -308,6 +414,66 @@ html_content = """
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let extractedData = [];
+        let categoryStats = {
+            income: {},
+            expenses: {}
+        };
+
+        // Categorization rules
+        const categories = {
+            income: {
+                'Card Payments': ['sumup', 'paymentsense', 'evo payments', 'dojo', 'american express', 'worldpay', 'stripe', 'square', 'paypal'],
+                'Bank Transfers': ['transfer', 'payment received', 'bacs'],
+                'Refunds': ['refund', 'reimbursement'],
+                'Other Income': []
+            },
+            expenses: {
+                'Advertising & Marketing': ['google ads', 'facebook ads', 'meta', 'instagram', 'linkedin', 'twitter', 'tiktok', 'advertising', 'marketing', 'mailchimp', 'hubspot'],
+                'Bank Fees & Charges': ['bank charge', 'bank fee', 'overdraft', 'interest charge', 'account fee', 'transaction fee'],
+                'Office Supplies': ['amazon', 'staples', 'office depot', 'ryman', 'viking', 'supplies'],
+                'Professional Services': ['accountant', 'solicitor', 'lawyer', 'consultant', 'hmrc', 'companies house'],
+                'Software & Subscriptions': ['microsoft', 'adobe', 'dropbox', 'zoom', 'slack', 'canva', 'notion', 'asana', 'trello', 'xero', 'quickbooks', 'sage', 'shopify', 'wix', 'squarespace'],
+                'Utilities & Communications': ['bt', 'vodafone', 'o2', 'ee', 'three', 'virgin', 'sky', 'talk talk', 'plusnet', 'telephone', 'internet', 'broadband', 'mobile'],
+                'Travel & Transport': ['uber', 'trainline', 'national rail', 'tfl', 'transport for london', 'parking', 'petrol', 'fuel', 'shell', 'bp', 'esso', 'tesco fuel'],
+                'Meals & Entertainment': ['restaurant', 'cafe', 'coffee', 'starbucks', 'costa', 'pret', 'food', 'lunch', 'dinner', 'deliveroo', 'uber eats', 'just eat'],
+                'Rent & Property': ['rent', 'lease', 'property', 'landlord', 'commercial rent'],
+                'Equipment & Technology': ['currys', 'pc world', 'apple', 'dell', 'hp', 'lenovo', 'equipment'],
+                'Insurance': ['insurance', 'policy', 'premium'],
+                'Payment Processing Fees': ['sumup fee', 'stripe fee', 'paypal fee', 'merchant fee', 'card fee'],
+                'Cost of Goods Sold': ['supplier', 'wholesale', 'inventory', 'stock', 'manufacturer'],
+                'Payroll & Staff': ['salary', 'wage', 'payroll', 'hmrc paye', 'pension'],
+                'Taxes': ['vat', 'tax', 'hmrc', 'corporation tax', 'self assessment'],
+                'General Business Expenses': []
+            }
+        };
+
+        function categorizeTransaction(details, transType, paidIn, paidOut) {
+            const detailsLower = details.toLowerCase();
+            
+            // Determine if it's income or expense
+            const isIncome = paidIn !== '';
+            const categoryGroup = isIncome ? categories.income : categories.expenses;
+            
+            // Search through categories
+            for (const [categoryName, keywords] of Object.entries(categoryGroup)) {
+                for (const keyword of keywords) {
+                    if (detailsLower.includes(keyword)) {
+                        return categoryName;
+                    }
+                }
+            }
+            
+            // Default categories based on transaction type
+            if (isIncome) {
+                if (transType === 'Card Transaction Refund') return 'Refunds';
+                if (transType === 'Domestic Transfer') return 'Bank Transfers';
+                return 'Other Income';
+            } else {
+                if (transType === 'Direct Debit') return 'Utilities & Communications';
+                if (transType === 'Fee') return 'Bank Fees & Charges';
+                return 'General Business Expenses';
+            }
+        }
 
         const fileInput = document.getElementById('fileInput');
         const uploadSection = document.getElementById('uploadSection');
@@ -357,6 +523,7 @@ html_content = """
                 updateProgress(30, `Processing ${pdf.numPages} pages...`);
 
                 extractedData = [];
+                categoryStats = { income: {}, expenses: {} };
 
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                     const page = await pdf.getPage(pageNum);
@@ -372,15 +539,32 @@ html_content = """
                     const lines = groupIntoLines(items);
                     extractTableData(lines);
                     
-                    const progress = 30 + (pageNum / pdf.numPages) * 60;
+                    const progress = 30 + (pageNum / pdf.numPages) * 50;
                     updateProgress(progress, `Processing page ${pageNum} of ${pdf.numPages}...`);
                 }
 
-                updateProgress(95, 'Finalizing...');
+                updateProgress(85, 'Categorizing transactions...');
 
-                if (extractedData.length === 0) {
-                    throw new Error('No transactions found. Please check if this is a valid Tide Bank statement.');
-                }
+                // Add categories to extracted data
+                extractedData.forEach(row => {
+                    const category = categorizeTransaction(
+                        row['Details'],
+                        row['Transaction type'],
+                        row['Paid in (£)'],
+                        row['Paid out (£)']
+                    );
+                    row['Category'] = category;
+                    
+                    // Update category stats
+                    if (row['Paid in (£)']) {
+                        const amount = parseFloat(row['Paid in (£)']);
+                        categoryStats.income[category] = (categoryStats.income[category] || 0) + amount;
+                    }
+                    if (row['Paid out (£)']) {
+                        const amount = parseFloat(row['Paid out (£)']);
+                        categoryStats.expenses[category] = (categoryStats.expenses[category] || 0) + amount;
+                    }
+                });
 
                 updateProgress(100, 'Complete!');
                 displayResults();
@@ -526,13 +710,21 @@ html_content = """
                 }
             });
 
+            const totalCategories = Object.keys(categoryStats.income).length + Object.keys(categoryStats.expenses).length;
+
             document.getElementById('totalTransactions').textContent = extractedData.length;
             document.getElementById('totalPaidIn').textContent = '£' + totalPaidIn.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalPaidOut').textContent = '£' + totalPaidOut.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('totalCategories').textContent = totalCategories;
 
+            // Display category summaries
+            displayCategorySummary('income', 'incomeCategories');
+            displayCategorySummary('expenses', 'expenseCategories');
+
+            // Display preview table
             const previewTable = document.getElementById('previewTable');
             let tableHTML = '<thead><tr>';
-            const headers = ['Date', 'Transaction type', 'Details', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
+            const headers = ['Date', 'Transaction type', 'Details', 'Category', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
             headers.forEach(header => {
                 tableHTML += `<th>${header}</th>`;
             });
@@ -550,23 +742,69 @@ html_content = """
             previewTable.innerHTML = tableHTML;
         }
 
+        function displayCategorySummary(type, elementId) {
+            const container = document.getElementById(elementId);
+            const stats = categoryStats[type];
+            
+            // Sort categories by amount (descending)
+            const sortedCategories = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+            
+            let html = '';
+            sortedCategories.forEach(([category, amount]) => {
+                const formattedAmount = '£' + amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const colorClass = type === 'income' ? 'income' : 'expense';
+                html += `
+                    <div class="category-item">
+                        <span class="category-name">${category}</span>
+                        <span class="category-amount ${colorClass}">${formattedAmount}</span>
+                    </div>
+                `;
+            });
+            
+            if (sortedCategories.length === 0) {
+                html = '<p style="color: #999; text-align: center; padding: 20px;">No transactions in this category</p>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.category-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.category-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            if (tab === 'income') {
+                document.getElementById('incomeCategories').classList.add('active');
+            } else {
+                document.getElementById('expenseCategories').classList.add('active');
+            }
+        }
+
         document.getElementById('downloadBtn').addEventListener('click', () => {
             const ws = XLSX.utils.json_to_sheet(extractedData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
             const colWidths = [
-                { wch: 15 },
-                { wch: 20 },
-                { wch: 60 },
-                { wch: 15 },
-                { wch: 15 },
-                { wch: 15 }
+                { wch: 15 }, // Date
+                { wch: 20 }, // Transaction type
+                { wch: 50 }, // Details
+                { wch: 25 }, // Category
+                { wch: 15 }, // Paid in
+                { wch: 15 }, // Paid out
+                { wch: 15 }  // Balance
             ];
             ws['!cols'] = colWidths;
 
             const now = new Date();
-            const filename = `bank_statement_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+            const filename = `bank_statement_categorized_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
 
             XLSX.writeFile(wb, filename);
         });
@@ -591,4 +829,4 @@ html_content = """
 """
 
 # Display the HTML component
-components.html(html_content, height=1000, scrolling=True)
+components.html(html_content, height=1200, scrolling=True)
