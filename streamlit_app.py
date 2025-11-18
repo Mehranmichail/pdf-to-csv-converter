@@ -13,9 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            css = """
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-"""
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -611,5 +609,6 @@
     </script>
 </body>
 </html>
+
 
 
