@@ -1,3 +1,11 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Set page config
+st.set_page_config(page_title="Bank Statement Converter", page_icon="🏦", layout="wide")
+
+# HTML content
+html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -297,7 +305,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-        // Set up PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let extractedData = [];
@@ -310,7 +317,6 @@
         const progressBar = document.getElementById('progressBar');
         const statusMessage = document.getElementById('statusMessage');
 
-        // Drag and drop
         uploadSection.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadSection.classList.add('dragover');
@@ -352,12 +358,10 @@
 
                 extractedData = [];
 
-                // Read all pages and extract text
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                     const page = await pdf.getPage(pageNum);
                     const textContent = await page.getTextContent();
                     
-                    // Extract text items with positions
                     const items = textContent.items.map(item => ({
                         text: item.str.trim(),
                         x: Math.round(item.transform[4]),
@@ -365,10 +369,7 @@
                         height: Math.round(item.height)
                     }));
 
-                    // Group items by Y position (same line)
                     const lines = groupIntoLines(items);
-                    
-                    // Extract table data from lines
                     extractTableData(lines);
                     
                     const progress = 30 + (pageNum / pdf.numPages) * 60;
@@ -392,13 +393,12 @@
         }
 
         function groupIntoLines(items) {
-            // Sort by Y position (top to bottom)
             items.sort((a, b) => b.y - a.y);
             
             const lines = [];
             let currentLine = [];
             let currentY = null;
-            const yThreshold = 5; // Items within 5px are on same line
+            const yThreshold = 5;
             
             items.forEach(item => {
                 if (item.text === '') return;
@@ -408,7 +408,6 @@
                     currentY = item.y;
                 } else {
                     if (currentLine.length > 0) {
-                        // Sort line items by X position (left to right)
                         currentLine.sort((a, b) => a.x - b.x);
                         lines.push(currentLine);
                     }
@@ -429,17 +428,12 @@
             for (let line of lines) {
                 const lineText = line.map(item => item.text).join(' ');
                 
-                // Check if this line contains a date (transaction line)
-                const dateMatch = lineText.match(/^(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/);
+                const dateMatch = lineText.match(/^(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{4})/);
                 
                 if (dateMatch) {
-                    // This is a transaction row
                     const date = dateMatch[1];
-                    
-                    // Get all text from the line
                     const allText = line.map(item => item.text);
                     
-                    // Find transaction type
                     let transType = '';
                     let transTypeIndex = -1;
                     const types = ['Card Transaction Refund', 'Card Transaction', 'Domestic Transfer', 'Direct Debit', 'Fee'];
@@ -447,7 +441,6 @@
                     for (let type of types) {
                         const idx = allText.findIndex(t => t.includes(type.split(' ')[0]));
                         if (idx !== -1) {
-                            // Check if full type matches
                             const checkText = allText.slice(idx, idx + type.split(' ').length).join(' ');
                             if (checkText.includes(type)) {
                                 transType = type;
@@ -459,33 +452,27 @@
                     
                     if (!transType) continue;
                     
-                    // Find all numbers (amounts)
                     const numbers = [];
                     for (let i = 0; i < allText.length; i++) {
                         const text = allText[i].replace(/,/g, '');
-                        if (/^\d+\.\d{2}$/.test(text)) {
+                        if (/^\\d+\\.\\d{2}$/.test(text)) {
                             numbers.push({ value: text, index: i });
                         }
                     }
                     
-                    if (numbers.length < 2) continue; // Need at least transaction amount and balance
+                    if (numbers.length < 2) continue;
                     
-                    // Last number is always balance
                     const balance = numbers[numbers.length - 1].value;
                     
-                    // Determine Paid In and Paid Out
                     let paidIn = '';
                     let paidOut = '';
                     
                     if (numbers.length === 3) {
-                        // Three columns: Paid In, Paid Out, Balance
                         paidIn = numbers[0].value;
                         paidOut = numbers[1].value;
                     } else if (numbers.length === 2) {
-                        // Two columns: either (Paid In, Balance) or (Paid Out, Balance)
                         const amount = numbers[0].value;
                         
-                        // Determine if it's income or expense
                         const detailsText = allText.join(' ').toLowerCase();
                         const isIncome = transType === 'Card Transaction Refund' || 
                                        (transType === 'Domestic Transfer' && (
@@ -503,16 +490,14 @@
                         }
                     }
                     
-                    // Extract details (everything between trans type and numbers)
                     let details = [];
                     for (let i = transTypeIndex + 1; i < numbers[0].index; i++) {
                         if (allText[i] && !allText[i].includes('Tide Card') && allText[i] !== '****') {
                             details.push(allText[i]);
                         }
                     }
-                    const detailsStr = details.join(' ').replace(/\s+/g, ' ').trim();
+                    const detailsStr = details.join(' ').replace(/\\s+/g, ' ').trim();
                     
-                    // Add transaction
                     extractedData.push({
                         'Date': date,
                         'Transaction type': transType,
@@ -529,7 +514,6 @@
             progressSection.style.display = 'none';
             resultSection.style.display = 'block';
 
-            // Calculate totals
             let totalPaidIn = 0;
             let totalPaidOut = 0;
 
@@ -546,7 +530,6 @@
             document.getElementById('totalPaidIn').textContent = '£' + totalPaidIn.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalPaidOut').textContent = '£' + totalPaidOut.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-            // Display preview table
             const previewTable = document.getElementById('previewTable');
             let tableHTML = '<thead><tr>';
             const headers = ['Date', 'Transaction type', 'Details', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
@@ -568,27 +551,23 @@
         }
 
         document.getElementById('downloadBtn').addEventListener('click', () => {
-            // Create workbook
             const ws = XLSX.utils.json_to_sheet(extractedData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
-            // Auto-size columns
             const colWidths = [
-                { wch: 15 }, // Date
-                { wch: 20 }, // Transaction type
-                { wch: 60 }, // Details
-                { wch: 15 }, // Paid in
-                { wch: 15 }, // Paid out
-                { wch: 15 }  // Balance
+                { wch: 15 },
+                { wch: 20 },
+                { wch: 60 },
+                { wch: 15 },
+                { wch: 15 },
+                { wch: 15 }
             ];
             ws['!cols'] = colWidths;
 
-            // Generate filename
             const now = new Date();
             const filename = `bank_statement_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
 
-            // Download
             XLSX.writeFile(wb, filename);
         });
 
@@ -609,6 +588,7 @@
     </script>
 </body>
 </html>
+"""
 
-
-
+# Display the HTML component
+components.html(html_content, height=1000, scrolling=True)
