@@ -11,7 +11,7 @@ html_content = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bank Statement PDF to CSV Converter</title>
+    <title>Bank Statement PDF to Excel Converter</title>
     <style>
         * {
             margin: 0;
@@ -333,7 +333,7 @@ html_content = """
     <div class="container">
         <div class="header">
             <h1>🏦 Bank Statement Converter</h1>
-            <p>Convert your bank PDF statements to CSV with automatic categorization</p>
+            <p>Convert your bank PDF statements to Excel with automatic categorization</p>
         </div>
 
         <div class="content">
@@ -384,7 +384,7 @@ html_content = """
                     </div>
 
                     <button class="btn download-btn" id="downloadBtn">
-                        📥 Download Transactions CSV
+                        📥 Download CSV File with Categories
                     </button>
                     
                     <div style="margin-top: 20px; padding: 15px; background: #f8f9ff; border-radius: 10px; border-left: 4px solid #667eea;">
@@ -519,34 +519,38 @@ html_content = """
             }
         }
 
-        // CSV helper functions
-        function escapeCSV(value) {
-            if (value === null || value === undefined) return '';
-            value = String(value);
-            if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-                return '"' + value.replace(/"/g, '""') + '"';
-            }
-            return value;
-        }
-
-        function arrayToCSV(data, headers) {
-            let csv = headers.map(escapeCSV).join(',') + '\n';
+        // CSV conversion functions
+        function convertToCSV(data) {
+            const headers = ['Date', 'Transaction type', 'Details', 'Category', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
+            let csv = headers.join(',') + '\\n';
+            
             data.forEach(row => {
-                csv += headers.map(header => escapeCSV(row[header] || '')).join(',') + '\n';
+                const values = headers.map(header => {
+                    let value = row[header] || '';
+                    // Escape values that contain commas or quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\\n';
             });
+            
             return csv;
         }
 
         function downloadCSV(csvContent, filename) {
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         }
 
         const fileInput = document.getElementById('fileInput');
@@ -1126,18 +1130,13 @@ html_content = """
             container.innerHTML = html;
         }
 
-        // Main transactions CSV download
         document.getElementById('downloadBtn').addEventListener('click', () => {
-            const headers = ['Date', 'Transaction type', 'Details', 'Category', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
-            const csvContent = arrayToCSV(extractedData, headers);
-            
+            const csvContent = convertToCSV(extractedData);
             const now = new Date();
             const filename = `bank_statement_categorized_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
-            
             downloadCSV(csvContent, filename);
         });
 
-        // Trial Balance CSV download
         document.getElementById('downloadTrialBalanceBtn').addEventListener('click', () => {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
@@ -1163,18 +1162,21 @@ html_content = """
             let totalDebit = 0;
             let totalCredit = 0;
             
+            // Get closing balance
             const closingBalance = extractedData.length > 0 ? 
                 parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
             
+            // Calculate total income and expenses first
             let totalIncome = 0;
             Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
             
             let totalExpenses = 0;
             Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
             
+            // Opening Balance = Closing Balance - Total Income + Total Expenses
             const openingBalance = closingBalance - totalIncome + totalExpenses;
             
-            // Bank Account
+            // Bank Account (Asset - Debit)
             trialBalanceData.push({
                 'Account': 'Bank Account (Closing)',
                 'Debit (£)': closingBalance.toFixed(2),
@@ -1188,7 +1190,7 @@ html_content = """
                 'Credit (£)': ''
             });
             
-            // Expenses
+            // Expenses (Debits)
             const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
             sortedExpenses.forEach(([category, amount]) => {
                 totalDebit += amount;
@@ -1205,7 +1207,7 @@ html_content = """
                 'Credit (£)': ''
             });
             
-            // Income
+            // Income (Credits)
             const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
             sortedIncome.forEach(([category, amount]) => {
                 totalCredit += amount;
@@ -1222,7 +1224,10 @@ html_content = """
                 'Credit (£)': ''
             });
             
+            // Net Profit/Loss for the period
             const netProfit = totalIncome - totalExpenses;
+            
+            // Capital/Equity = Opening Balance + Net Profit
             const capital = openingBalance + netProfit;
             
             trialBalanceData.push({
@@ -1249,21 +1254,29 @@ html_content = """
                 'Credit (£)': totalCredit.toFixed(2)
             });
             
-            const headers = ['Account', 'Debit (£)', 'Credit (£)'];
-            const csvContent = arrayToCSV(trialBalanceData, headers);
+            // Convert to CSV
+            let csv = 'Account,Debit (£),Credit (£)\\n';
+            trialBalanceData.forEach(row => {
+                const values = [row['Account'], row['Debit (£)'], row['Credit (£)']].map(value => {
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\\n';
+            });
             
             const now = new Date();
             const filename = `trial_balance_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
-            
-            downloadCSV(csvContent, filename);
+            downloadCSV(csv, filename);
         });
 
-        // Profit & Loss CSV download
         document.getElementById('downloadPLBtn').addEventListener('click', () => {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
             const plData = [];
             
+            // Header with period
             plData.push({
                 'Description': 'PROFIT & LOSS STATEMENT',
                 'Amount (£)': ''
@@ -1329,22 +1342,30 @@ html_content = """
                 'Amount (£)': ''
             });
             
+            // Net Profit/Loss
             const netProfit = totalIncome - totalExpenses;
             plData.push({
                 'Description': netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS',
                 'Amount (£)': Math.abs(netProfit).toFixed(2)
             });
             
-            const headers = ['Description', 'Amount (£)'];
-            const csvContent = arrayToCSV(plData, headers);
+            // Convert to CSV
+            let csv = 'Description,Amount (£)\\n';
+            plData.forEach(row => {
+                const values = [row['Description'], row['Amount (£)']].map(value => {
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\\n';
+            });
             
             const now = new Date();
             const filename = `profit_loss_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
-            
-            downloadCSV(csvContent, filename);
+            downloadCSV(csv, filename);
         });
 
-        // Balance Sheet CSV download
         document.getElementById('downloadBalanceSheetBtn').addEventListener('click', () => {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
@@ -1362,6 +1383,7 @@ html_content = """
             const netProfit = totalIncome - totalExpenses;
             const equity = openingBalance + netProfit;
             
+            // Header with date
             bsData.push({
                 'Description': 'BALANCE SHEET',
                 'Amount (£)': ''
@@ -1412,13 +1434,21 @@ html_content = """
                 'Amount (£)': equity.toFixed(2)
             });
             
-            const headers = ['Description', 'Amount (£)'];
-            const csvContent = arrayToCSV(bsData, headers);
+            // Convert to CSV
+            let csv = 'Description,Amount (£)\\n';
+            bsData.forEach(row => {
+                const values = [row['Description'], row['Amount (£)']].map(value => {
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\\n';
+            });
             
             const now = new Date();
             const filename = `balance_sheet_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
-            
-            downloadCSV(csvContent, filename);
+            downloadCSV(csv, filename);
         });
 
         function updateProgress(percent, message) {
