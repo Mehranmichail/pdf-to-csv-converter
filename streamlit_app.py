@@ -377,11 +377,27 @@ html_content = """
                             <div class="label">Categories Found</div>
                             <div class="value" id="totalCategories">0</div>
                         </div>
+                        <div class="stat-card">
+                            <div class="label">Net Profit/Loss</div>
+                            <div class="value" id="netProfit">£0.00</div>
+                        </div>
                     </div>
 
                     <button class="btn download-btn" id="downloadBtn">
                         📥 Download Excel File with Categories
                     </button>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 15px;">
+                        <button class="btn" id="downloadTrialBalanceBtn" style="padding: 10px 20px; font-size: 14px;">
+                            📊 Download Trial Balance
+                        </button>
+                        <button class="btn" id="downloadPLBtn" style="padding: 10px 20px; font-size: 14px;">
+                            💰 Download Profit & Loss
+                        </button>
+                        <button class="btn" id="downloadBalanceSheetBtn" style="padding: 10px 20px; font-size: 14px;">
+                            📋 Download Balance Sheet
+                        </button>
+                    </div>
                 </div>
 
                 <div class="category-summary">
@@ -394,6 +410,20 @@ html_content = """
 
                     <div id="incomeCategories" class="category-content active"></div>
                     <div id="expenseCategories" class="category-content"></div>
+                </div>
+
+                <div class="category-summary">
+                    <h3>📑 Financial Statements Preview</h3>
+                    
+                    <div class="category-tabs">
+                        <button class="category-tab active" onclick="switchFinancialTab('trialbalance')">Trial Balance</button>
+                        <button class="category-tab" onclick="switchFinancialTab('profitloss')">Profit & Loss</button>
+                        <button class="category-tab" onclick="switchFinancialTab('balancesheet')">Balance Sheet</button>
+                    </div>
+
+                    <div id="trialBalancePreview" class="category-content active"></div>
+                    <div id="profitLossPreview" class="category-content"></div>
+                    <div id="balanceSheetPreview" class="category-content"></div>
                 </div>
 
                 <div class="preview-table">
@@ -710,16 +740,26 @@ html_content = """
                 }
             });
 
+            const netProfit = totalPaidIn - totalPaidOut;
             const totalCategories = Object.keys(categoryStats.income).length + Object.keys(categoryStats.expenses).length;
 
             document.getElementById('totalTransactions').textContent = extractedData.length;
             document.getElementById('totalPaidIn').textContent = '£' + totalPaidIn.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalPaidOut').textContent = '£' + totalPaidOut.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalCategories').textContent = totalCategories;
+            
+            const netProfitElement = document.getElementById('netProfit');
+            netProfitElement.textContent = '£' + netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            netProfitElement.style.color = netProfit >= 0 ? '#4CAF50' : '#f44336';
 
             // Display category summaries
             displayCategorySummary('income', 'incomeCategories');
             displayCategorySummary('expenses', 'expenseCategories');
+            
+            // Display financial statements
+            displayTrialBalance();
+            displayProfitAndLoss();
+            displayBalanceSheet();
 
             // Display preview table
             const previewTable = document.getElementById('previewTable');
@@ -787,6 +827,186 @@ html_content = """
             }
         }
 
+        function switchFinancialTab(tab) {
+            // Update tab buttons
+            const parentTabs = event.target.parentElement;
+            parentTabs.querySelectorAll('.category-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update content
+            const parentContent = parentTabs.nextElementSibling.parentElement;
+            parentContent.querySelectorAll('.category-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            if (tab === 'trialbalance') {
+                document.getElementById('trialBalancePreview').classList.add('active');
+            } else if (tab === 'profitloss') {
+                document.getElementById('profitLossPreview').classList.add('active');
+            } else if (tab === 'balancesheet') {
+                document.getElementById('balanceSheetPreview').classList.add('active');
+            }
+        }
+
+        function displayTrialBalance() {
+            const container = document.getElementById('trialBalancePreview');
+            
+            let html = '<div style="overflow-x: auto;"><table style="width: 100%; margin-top: 10px;">';
+            html += '<thead><tr><th>Account</th><th>Debit (£)</th><th>Credit (£)</th></tr></thead><tbody>';
+            
+            let totalDebit = 0;
+            let totalCredit = 0;
+            
+            // Add income categories (Credits)
+            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedIncome.forEach(([category, amount]) => {
+                totalCredit += amount;
+                html += `<tr>
+                    <td>${category}</td>
+                    <td>-</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            });
+            
+            // Add expense categories (Debits)
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedExpenses.forEach(([category, amount]) => {
+                totalDebit += amount;
+                html += `<tr>
+                    <td>${category}</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>-</td>
+                </tr>`;
+            });
+            
+            // Opening/Closing balance (assuming bank account)
+            const openingBalance = extractedData.length > 0 ? parseFloat(extractedData[0]['Balance (£)']) - (parseFloat(extractedData[0]['Paid in (£)']) || 0) + (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
+            const closingBalance = extractedData.length > 0 ? parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
+            
+            html += `<tr style="border-top: 2px solid #667eea;">
+                <td><strong>TOTAL</strong></td>
+                <td style="text-align: right;"><strong>${totalDebit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td style="text-align: right;"><strong>${totalCredit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+            </tr>`;
+            
+            html += '</tbody></table></div>';
+            
+            container.innerHTML = html;
+        }
+
+        function displayProfitAndLoss() {
+            const container = document.getElementById('profitLossPreview');
+            
+            let html = '<div style="overflow-x: auto;"><table style="width: 100%; margin-top: 10px;">';
+            html += '<thead><tr><th style="text-align: left;">Description</th><th style="text-align: right;">Amount (£)</th></tr></thead><tbody>';
+            
+            // Income Section
+            html += '<tr style="background: #f0f8ff;"><td colspan="2"><strong>INCOME (RECEIPTS)</strong></td></tr>';
+            let totalIncome = 0;
+            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => b[1] - a[1]);
+            sortedIncome.forEach(([category, amount]) => {
+                totalIncome += amount;
+                html += `<tr>
+                    <td style="padding-left: 20px;">${category}</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            });
+            html += `<tr style="font-weight: bold; background: #e3f2fd;">
+                <td>Total Income</td>
+                <td style="text-align: right;">${totalIncome.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            
+            // Expenses Section
+            html += '<tr style="background: #fff3e0; height: 10px;"><td colspan="2"></td></tr>';
+            html += '<tr style="background: #fff3e0;"><td colspan="2"><strong>EXPENSES (PAYMENTS)</strong></td></tr>';
+            let totalExpenses = 0;
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => b[1] - a[1]);
+            sortedExpenses.forEach(([category, amount]) => {
+                totalExpenses += amount;
+                html += `<tr>
+                    <td style="padding-left: 20px;">${category}</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            });
+            html += `<tr style="font-weight: bold; background: #ffe0b2;">
+                <td>Total Expenses</td>
+                <td style="text-align: right;">${totalExpenses.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            
+            // Net Profit/Loss
+            const netProfit = totalIncome - totalExpenses;
+            const profitColor = netProfit >= 0 ? '#4CAF50' : '#f44336';
+            html += `<tr style="font-weight: bold; font-size: 16px; background: #f5f5f5; border-top: 3px solid #667eea;">
+                <td>NET ${netProfit >= 0 ? 'PROFIT' : 'LOSS'}</td>
+                <td style="text-align: right; color: ${profitColor};">${Math.abs(netProfit).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            
+            html += '</tbody></table></div>';
+            
+            container.innerHTML = html;
+        }
+
+        function displayBalanceSheet() {
+            const container = document.getElementById('balanceSheetPreview');
+            
+            const closingBalance = extractedData.length > 0 ? parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
+            const openingBalance = extractedData.length > 0 ? parseFloat(extractedData[0]['Balance (£)']) - (parseFloat(extractedData[0]['Paid in (£)']) || 0) + (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
+            
+            let totalIncome = 0;
+            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
+            
+            let totalExpenses = 0;
+            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
+            
+            const netProfit = totalIncome - totalExpenses;
+            const equity = openingBalance + netProfit;
+            
+            let html = '<div style="overflow-x: auto;"><table style="width: 100%; margin-top: 10px;">';
+            html += '<thead><tr><th style="text-align: left;">Description</th><th style="text-align: right;">Amount (£)</th></tr></thead><tbody>';
+            
+            // Assets Section
+            html += '<tr style="background: #e8f5e9;"><td colspan="2"><strong>ASSETS</strong></td></tr>';
+            html += `<tr>
+                <td style="padding-left: 20px;">Cash at Bank</td>
+                <td style="text-align: right;">${closingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            html += `<tr style="font-weight: bold; background: #c8e6c9;">
+                <td>Total Assets</td>
+                <td style="text-align: right;">${closingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            
+            // Equity Section
+            html += '<tr style="background: #e3f2fd; height: 10px;"><td colspan="2"></td></tr>';
+            html += '<tr style="background: #e3f2fd;"><td colspan="2"><strong>EQUITY</strong></td></tr>';
+            html += `<tr>
+                <td style="padding-left: 20px;">Opening Balance</td>
+                <td style="text-align: right;">${openingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            html += `<tr>
+                <td style="padding-left: 20px;">Net Profit/(Loss)</td>
+                <td style="text-align: right; color: ${netProfit >= 0 ? '#4CAF50' : '#f44336'};">${netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            html += `<tr style="font-weight: bold; background: #bbdefb;">
+                <td>Total Equity</td>
+                <td style="text-align: right;">${equity.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+            
+            html += '</tbody></table></div>';
+            
+            // Note about balance
+            const difference = Math.abs(closingBalance - equity);
+            if (difference > 0.01) {
+                html += `<p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; font-size: 12px;">
+                    <strong>Note:</strong> This is a simplified balance sheet based on bank transactions. 
+                    Difference of £${difference.toFixed(2)} may exist due to non-cash items, assets, or liabilities not captured in bank statements.
+                </p>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
         document.getElementById('downloadBtn').addEventListener('click', () => {
             const ws = XLSX.utils.json_to_sheet(extractedData);
             const wb = XLSX.utils.book_new();
@@ -806,6 +1026,228 @@ html_content = """
             const now = new Date();
             const filename = `bank_statement_categorized_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
 
+            XLSX.writeFile(wb, filename);
+        });
+
+        document.getElementById('downloadTrialBalanceBtn').addEventListener('click', () => {
+            const trialBalanceData = [];
+            
+            // Add header
+            trialBalanceData.push({
+                'Account': 'TRIAL BALANCE',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            let totalDebit = 0;
+            let totalCredit = 0;
+            
+            // Income (Credits)
+            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedIncome.forEach(([category, amount]) => {
+                totalCredit += amount;
+                trialBalanceData.push({
+                    'Account': category,
+                    'Debit (£)': '',
+                    'Credit (£)': amount.toFixed(2)
+                });
+            });
+            
+            // Expenses (Debits)
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedExpenses.forEach(([category, amount]) => {
+                totalDebit += amount;
+                trialBalanceData.push({
+                    'Account': category,
+                    'Debit (£)': amount.toFixed(2),
+                    'Credit (£)': ''
+                });
+            });
+            
+            // Totals
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            trialBalanceData.push({
+                'Account': 'TOTAL',
+                'Debit (£)': totalDebit.toFixed(2),
+                'Credit (£)': totalCredit.toFixed(2)
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(trialBalanceData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Trial Balance');
+            
+            ws['!cols'] = [{ wch: 40 }, { wch: 15 }, { wch: 15 }];
+            
+            const now = new Date();
+            const filename = `trial_balance_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+            
+            XLSX.writeFile(wb, filename);
+        });
+
+        document.getElementById('downloadPLBtn').addEventListener('click', () => {
+            const plData = [];
+            
+            // Header
+            plData.push({
+                'Description': 'PROFIT & LOSS STATEMENT',
+                'Amount (£)': ''
+            });
+            plData.push({
+                'Description': '',
+                'Amount (£)': ''
+            });
+            
+            // Income
+            plData.push({
+                'Description': 'INCOME (RECEIPTS)',
+                'Amount (£)': ''
+            });
+            
+            let totalIncome = 0;
+            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => b[1] - a[1]);
+            sortedIncome.forEach(([category, amount]) => {
+                totalIncome += amount;
+                plData.push({
+                    'Description': '  ' + category,
+                    'Amount (£)': amount.toFixed(2)
+                });
+            });
+            
+            plData.push({
+                'Description': 'Total Income',
+                'Amount (£)': totalIncome.toFixed(2)
+            });
+            
+            plData.push({
+                'Description': '',
+                'Amount (£)': ''
+            });
+            
+            // Expenses
+            plData.push({
+                'Description': 'EXPENSES (PAYMENTS)',
+                'Amount (£)': ''
+            });
+            
+            let totalExpenses = 0;
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => b[1] - a[1]);
+            sortedExpenses.forEach(([category, amount]) => {
+                totalExpenses += amount;
+                plData.push({
+                    'Description': '  ' + category,
+                    'Amount (£)': amount.toFixed(2)
+                });
+            });
+            
+            plData.push({
+                'Description': 'Total Expenses',
+                'Amount (£)': totalExpenses.toFixed(2)
+            });
+            
+            plData.push({
+                'Description': '',
+                'Amount (£)': ''
+            });
+            
+            // Net Profit/Loss
+            const netProfit = totalIncome - totalExpenses;
+            plData.push({
+                'Description': netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS',
+                'Amount (£)': Math.abs(netProfit).toFixed(2)
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(plData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Profit and Loss');
+            
+            ws['!cols'] = [{ wch: 50 }, { wch: 15 }];
+            
+            const now = new Date();
+            const filename = `profit_loss_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+            
+            XLSX.writeFile(wb, filename);
+        });
+
+        document.getElementById('downloadBalanceSheetBtn').addEventListener('click', () => {
+            const bsData = [];
+            
+            const closingBalance = extractedData.length > 0 ? parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
+            const openingBalance = extractedData.length > 0 ? parseFloat(extractedData[0]['Balance (£)']) - (parseFloat(extractedData[0]['Paid in (£)']) || 0) + (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
+            
+            let totalIncome = 0;
+            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
+            
+            let totalExpenses = 0;
+            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
+            
+            const netProfit = totalIncome - totalExpenses;
+            const equity = openingBalance + netProfit;
+            
+            // Header
+            bsData.push({
+                'Description': 'BALANCE SHEET',
+                'Amount (£)': ''
+            });
+            bsData.push({
+                'Description': '',
+                'Amount (£)': ''
+            });
+            
+            // Assets
+            bsData.push({
+                'Description': 'ASSETS',
+                'Amount (£)': ''
+            });
+            bsData.push({
+                'Description': '  Cash at Bank',
+                'Amount (£)': closingBalance.toFixed(2)
+            });
+            bsData.push({
+                'Description': 'Total Assets',
+                'Amount (£)': closingBalance.toFixed(2)
+            });
+            
+            bsData.push({
+                'Description': '',
+                'Amount (£)': ''
+            });
+            
+            // Equity
+            bsData.push({
+                'Description': 'EQUITY',
+                'Amount (£)': ''
+            });
+            bsData.push({
+                'Description': '  Opening Balance',
+                'Amount (£)': openingBalance.toFixed(2)
+            });
+            bsData.push({
+                'Description': '  Net Profit/(Loss)',
+                'Amount (£)': netProfit.toFixed(2)
+            });
+            bsData.push({
+                'Description': 'Total Equity',
+                'Amount (£)': equity.toFixed(2)
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(bsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Balance Sheet');
+            
+            ws['!cols'] = [{ wch: 50 }, { wch: 15 }];
+            
+            const now = new Date();
+            const filename = `balance_sheet_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+            
             XLSX.writeFile(wb, filename);
         });
 
