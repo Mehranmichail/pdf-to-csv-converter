@@ -387,32 +387,9 @@ html_content = """
                         📥 Download CSV File with Categories
                     </button>
                     
-                    <div style="margin-top: 20px; padding: 15px; background: #f8f9ff; border-radius: 10px; border-left: 4px solid #667eea;">
-                        <h4 style="color: #667eea; margin-bottom: 10px;">📅 Financial Statement Period</h4>
-                        <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Specify the period for your financial statements:</p>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                            <div>
-                                <label style="display: block; font-size: 12px; color: #666; margin-bottom: 5px;">From Date:</label>
-                                <input type="date" id="startDate" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 12px; color: #666; margin-bottom: 5px;">To Date:</label>
-                                <input type="date" id="endDate" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 15px;">
-                        <button class="btn" id="downloadTrialBalanceBtn" style="padding: 10px 20px; font-size: 14px;">
-                            📊 Download Trial Balance (CSV)
-                        </button>
-                        <button class="btn" id="downloadPLBtn" style="padding: 10px 20px; font-size: 14px;">
-                            💰 Download Profit & Loss (CSV)
-                        </button>
-                        <button class="btn" id="downloadBalanceSheetBtn" style="padding: 10px 20px; font-size: 14px;">
-                            📋 Download Balance Sheet (CSV)
-                        </button>
-                    </div>
+                    <button class="btn download-btn" id="downloadTrialBalanceBtn" style="margin-top: 10px;">
+                        📊 Download Trial Balance (CSV)
+                    </button>
                 </div>
 
                 <div class="category-summary">
@@ -428,17 +405,9 @@ html_content = """
                 </div>
 
                 <div class="category-summary">
-                    <h3>📑 Financial Statements Preview</h3>
-                    
-                    <div class="category-tabs">
-                        <button class="category-tab active" onclick="switchFinancialTab('trialbalance')">Trial Balance</button>
-                        <button class="category-tab" onclick="switchFinancialTab('profitloss')">Profit & Loss</button>
-                        <button class="category-tab" onclick="switchFinancialTab('balancesheet')">Balance Sheet</button>
-                    </div>
+                    <h3>📑 Trial Balance Preview</h3>
 
-                    <div id="trialBalancePreview" class="category-content active"></div>
-                    <div id="profitLossPreview" class="category-content"></div>
-                    <div id="balanceSheetPreview" class="category-content"></div>
+                    <div id="trialBalancePreview"></div>
                 </div>
 
                 <div class="preview-table">
@@ -800,22 +769,12 @@ html_content = """
             netProfitElement.textContent = '£' + netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             netProfitElement.style.color = netProfit >= 0 ? '#4CAF50' : '#f44336';
 
-            // Set date range from transactions
-            if (extractedData.length > 0) {
-                const firstDate = parseStatementDate(extractedData[0]['Date']);
-                const lastDate = parseStatementDate(extractedData[extractedData.length - 1]['Date']);
-                document.getElementById('startDate').value = firstDate;
-                document.getElementById('endDate').value = lastDate;
-            }
-
             // Display category summaries
             displayCategorySummary('income', 'incomeCategories');
             displayCategorySummary('expenses', 'expenseCategories');
             
-            // Display financial statements
+            // Display trial balance
             displayTrialBalance();
-            displayProfitAndLoss();
-            displayBalanceSheet();
 
             // Display preview table
             const previewTable = document.getElementById('previewTable');
@@ -897,29 +856,6 @@ html_content = """
             }
         }
 
-        function switchFinancialTab(tab) {
-            // Update tab buttons
-            const parentTabs = event.target.parentElement;
-            parentTabs.querySelectorAll('.category-tab').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            // Update content
-            const parentContent = parentTabs.nextElementSibling.parentElement;
-            parentContent.querySelectorAll('.category-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            
-            if (tab === 'trialbalance') {
-                document.getElementById('trialBalancePreview').classList.add('active');
-            } else if (tab === 'profitloss') {
-                document.getElementById('profitLossPreview').classList.add('active');
-            } else if (tab === 'balancesheet') {
-                document.getElementById('balanceSheetPreview').classList.add('active');
-            }
-        }
-
         function displayTrialBalance() {
             const container = document.getElementById('trialBalancePreview');
             
@@ -929,44 +865,8 @@ html_content = """
             let totalDebit = 0;
             let totalCredit = 0;
             
-            // Get closing balance
-            const closingBalance = extractedData.length > 0 ? 
-                parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
-            
-            // Calculate total income and expenses first
-            let totalIncome = 0;
-            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
-            
-            let totalExpenses = 0;
-            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
-            
-            // Opening Balance = Closing Balance - Total Income + Total Expenses
-            const openingBalance = closingBalance - totalIncome + totalExpenses;
-            
-            // Bank Account (Asset - Debit balance)
-            html += `<tr>
-                <td><strong>Bank Account (Closing)</strong></td>
-                <td style="text-align: right;">${closingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td>-</td>
-            </tr>`;
-            totalDebit += closingBalance;
-            
-            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
-            
-            // Expense categories (Debits)
-            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
-            sortedExpenses.forEach(([category, amount]) => {
-                totalDebit += amount;
-                html += `<tr>
-                    <td>${category}</td>
-                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                    <td>-</td>
-                </tr>`;
-            });
-            
-            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
-            
-            // Income categories (Credits)
+            // Income categories (Credits) - Money received
+            html += '<tr style="background: #f0f8ff;"><td colspan="3"><strong>INCOME</strong></td></tr>';
             const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
             sortedIncome.forEach(([category, amount]) => {
                 totalCredit += amount;
@@ -979,23 +879,45 @@ html_content = """
             
             html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
             
-            // Net Profit/Loss for the period
-            const netProfit = totalIncome - totalExpenses;
+            // Expense categories (Debits) - Money paid out
+            html += '<tr style="background: #fff3e0;"><td colspan="3"><strong>EXPENSES</strong></td></tr>';
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedExpenses.forEach(([category, amount]) => {
+                totalDebit += amount;
+                html += `<tr>
+                    <td>${category}</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>-</td>
+                </tr>`;
+            });
             
-            // Capital/Equity = Opening Balance + Net Profit
-            const capital = openingBalance + netProfit;
+            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
             
-            html += `<tr>
-                <td><strong>Capital/Equity</strong></td>
-                <td>-</td>
-                <td style="text-align: right;">${capital.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            html += `<tr style="font-size: 11px; color: #666;">
-                <td colspan="3" style="padding-left: 20px;">Opening Balance: £${openingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2})} + Net Profit: £${netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2})}</td>
-            </tr>`;
-            totalCredit += capital;
+            // Calculate net movement (income - expenses)
+            const netMovement = totalCredit - totalDebit;
+            
+            // Bank Account - shows the net effect
+            html += '<tr style="background: #e8f5e9;"><td colspan="3"><strong>ASSETS</strong></td></tr>';
+            if (netMovement >= 0) {
+                // Net income - Bank account increases (Debit)
+                totalDebit += netMovement;
+                html += `<tr>
+                    <td>Bank Account</td>
+                    <td style="text-align: right;">${netMovement.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>-</td>
+                </tr>`;
+            } else {
+                // Net loss - Bank account decreases (Credit)
+                totalCredit += Math.abs(netMovement);
+                html += `<tr>
+                    <td>Bank Account</td>
+                    <td>-</td>
+                    <td style="text-align: right;">${Math.abs(netMovement).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            }
             
             // Totals
+            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
             html += `<tr style="border-top: 2px solid #667eea; background: #f0f8ff;">
                 <td><strong>TOTAL</strong></td>
                 <td style="text-align: right;"><strong>${totalDebit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
@@ -1019,117 +941,6 @@ html_content = """
             container.innerHTML = html;
         }
 
-        function displayProfitAndLoss() {
-            const container = document.getElementById('profitLossPreview');
-            
-            let html = '<div style="overflow-x: auto;"><table style="width: 100%; margin-top: 10px;">';
-            html += '<thead><tr><th style="text-align: left;">Description</th><th style="text-align: right;">Amount (£)</th></tr></thead><tbody>';
-            
-            // Income Section
-            html += '<tr style="background: #f0f8ff;"><td colspan="2"><strong>INCOME (RECEIPTS)</strong></td></tr>';
-            let totalIncome = 0;
-            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => b[1] - a[1]);
-            sortedIncome.forEach(([category, amount]) => {
-                totalIncome += amount;
-                html += `<tr>
-                    <td style="padding-left: 20px;">${category}</td>
-                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                </tr>`;
-            });
-            html += `<tr style="font-weight: bold; background: #e3f2fd;">
-                <td>Total Income</td>
-                <td style="text-align: right;">${totalIncome.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            
-            // Expenses Section
-            html += '<tr style="background: #fff3e0; height: 10px;"><td colspan="2"></td></tr>';
-            html += '<tr style="background: #fff3e0;"><td colspan="2"><strong>EXPENSES (PAYMENTS)</strong></td></tr>';
-            let totalExpenses = 0;
-            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => b[1] - a[1]);
-            sortedExpenses.forEach(([category, amount]) => {
-                totalExpenses += amount;
-                html += `<tr>
-                    <td style="padding-left: 20px;">${category}</td>
-                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                </tr>`;
-            });
-            html += `<tr style="font-weight: bold; background: #ffe0b2;">
-                <td>Total Expenses</td>
-                <td style="text-align: right;">${totalExpenses.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            
-            // Net Profit/Loss
-            const netProfit = totalIncome - totalExpenses;
-            const profitColor = netProfit >= 0 ? '#4CAF50' : '#f44336';
-            html += `<tr style="font-weight: bold; font-size: 16px; background: #f5f5f5; border-top: 3px solid #667eea;">
-                <td>NET ${netProfit >= 0 ? 'PROFIT' : 'LOSS'}</td>
-                <td style="text-align: right; color: ${profitColor};">${Math.abs(netProfit).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            
-            html += '</tbody></table></div>';
-            
-            container.innerHTML = html;
-        }
-
-        function displayBalanceSheet() {
-            const container = document.getElementById('balanceSheetPreview');
-            
-            const closingBalance = extractedData.length > 0 ? parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
-            const openingBalance = extractedData.length > 0 ? parseFloat(extractedData[0]['Balance (£)']) - (parseFloat(extractedData[0]['Paid in (£)']) || 0) + (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
-            
-            let totalIncome = 0;
-            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
-            
-            let totalExpenses = 0;
-            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
-            
-            const netProfit = totalIncome - totalExpenses;
-            const equity = openingBalance + netProfit;
-            
-            let html = '<div style="overflow-x: auto;"><table style="width: 100%; margin-top: 10px;">';
-            html += '<thead><tr><th style="text-align: left;">Description</th><th style="text-align: right;">Amount (£)</th></tr></thead><tbody>';
-            
-            // Assets Section
-            html += '<tr style="background: #e8f5e9;"><td colspan="2"><strong>ASSETS</strong></td></tr>';
-            html += `<tr>
-                <td style="padding-left: 20px;">Cash at Bank</td>
-                <td style="text-align: right;">${closingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            html += `<tr style="font-weight: bold; background: #c8e6c9;">
-                <td>Total Assets</td>
-                <td style="text-align: right;">${closingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            
-            // Equity Section
-            html += '<tr style="background: #e3f2fd; height: 10px;"><td colspan="2"></td></tr>';
-            html += '<tr style="background: #e3f2fd;"><td colspan="2"><strong>EQUITY</strong></td></tr>';
-            html += `<tr>
-                <td style="padding-left: 20px;">Opening Balance</td>
-                <td style="text-align: right;">${openingBalance.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            html += `<tr>
-                <td style="padding-left: 20px;">Net Profit/(Loss)</td>
-                <td style="text-align: right; color: ${netProfit >= 0 ? '#4CAF50' : '#f44336'};">${netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            html += `<tr style="font-weight: bold; background: #bbdefb;">
-                <td>Total Equity</td>
-                <td style="text-align: right;">${equity.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-            </tr>`;
-            
-            html += '</tbody></table></div>';
-            
-            // Note about balance
-            const difference = Math.abs(closingBalance - equity);
-            if (difference > 0.01) {
-                html += `<p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; font-size: 12px;">
-                    <strong>Note:</strong> This is a simplified balance sheet based on bank transactions. 
-                    Difference of £${difference.toFixed(2)} may exist due to non-cash items, assets, or liabilities not captured in bank statements.
-                </p>`;
-            }
-            
-            container.innerHTML = html;
-        }
-
         document.getElementById('downloadBtn').addEventListener('click', () => {
             const csvContent = convertToCSV(extractedData);
             const now = new Date();
@@ -1138,18 +949,16 @@ html_content = """
         });
 
         document.getElementById('downloadTrialBalanceBtn').addEventListener('click', () => {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
             const trialBalanceData = [];
             
-            // Add header with period
+            // Add header
             trialBalanceData.push({
                 'Account': 'TRIAL BALANCE',
                 'Debit (£)': '',
                 'Credit (£)': ''
             });
             trialBalanceData.push({
-                'Account': `Period: ${startDate} to ${endDate}`,
+                'Account': 'Period transactions only (excluding opening balances)',
                 'Debit (£)': '',
                 'Credit (£)': ''
             });
@@ -1162,52 +971,13 @@ html_content = """
             let totalDebit = 0;
             let totalCredit = 0;
             
-            // Get closing balance
-            const closingBalance = extractedData.length > 0 ? 
-                parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
-            
-            // Calculate total income and expenses first
-            let totalIncome = 0;
-            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
-            
-            let totalExpenses = 0;
-            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
-            
-            // Opening Balance = Closing Balance - Total Income + Total Expenses
-            const openingBalance = closingBalance - totalIncome + totalExpenses;
-            
-            // Bank Account (Asset - Debit)
-            trialBalanceData.push({
-                'Account': 'Bank Account (Closing)',
-                'Debit (£)': closingBalance.toFixed(2),
-                'Credit (£)': ''
-            });
-            totalDebit += closingBalance;
-            
-            trialBalanceData.push({
-                'Account': '',
-                'Debit (£)': '',
-                'Credit (£)': ''
-            });
-            
-            // Expenses (Debits)
-            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
-            sortedExpenses.forEach(([category, amount]) => {
-                totalDebit += amount;
-                trialBalanceData.push({
-                    'Account': category,
-                    'Debit (£)': amount.toFixed(2),
-                    'Credit (£)': ''
-                });
-            });
-            
-            trialBalanceData.push({
-                'Account': '',
-                'Debit (£)': '',
-                'Credit (£)': ''
-            });
-            
             // Income (Credits)
+            trialBalanceData.push({
+                'Account': 'INCOME',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
             const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
             sortedIncome.forEach(([category, amount]) => {
                 totalCredit += amount;
@@ -1224,23 +994,54 @@ html_content = """
                 'Credit (£)': ''
             });
             
-            // Net Profit/Loss for the period
-            const netProfit = totalIncome - totalExpenses;
-            
-            // Capital/Equity = Opening Balance + Net Profit
-            const capital = openingBalance + netProfit;
-            
+            // Expenses (Debits)
             trialBalanceData.push({
-                'Account': 'Capital/Equity',
-                'Debit (£)': '',
-                'Credit (£)': capital.toFixed(2)
-            });
-            trialBalanceData.push({
-                'Account': `  Opening Balance: £${openingBalance.toFixed(2)} + Net Profit: £${netProfit.toFixed(2)}`,
+                'Account': 'EXPENSES',
                 'Debit (£)': '',
                 'Credit (£)': ''
             });
-            totalCredit += capital;
+            
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedExpenses.forEach(([category, amount]) => {
+                totalDebit += amount;
+                trialBalanceData.push({
+                    'Account': category,
+                    'Debit (£)': amount.toFixed(2),
+                    'Credit (£)': ''
+                });
+            });
+            
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            // Bank Account - net movement
+            trialBalanceData.push({
+                'Account': 'ASSETS',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            const netMovement = totalCredit - totalDebit;
+            if (netMovement >= 0) {
+                // Net income - Bank increases (Debit)
+                totalDebit += netMovement;
+                trialBalanceData.push({
+                    'Account': 'Bank Account',
+                    'Debit (£)': netMovement.toFixed(2),
+                    'Credit (£)': ''
+                });
+            } else {
+                // Net loss - Bank decreases (Credit)
+                totalCredit += Math.abs(netMovement);
+                trialBalanceData.push({
+                    'Account': 'Bank Account',
+                    'Debit (£)': '',
+                    'Credit (£)': Math.abs(netMovement).toFixed(2)
+                });
+            }
             
             // Totals
             trialBalanceData.push({
@@ -1268,186 +1069,6 @@ html_content = """
             
             const now = new Date();
             const filename = `trial_balance_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
-            downloadCSV(csv, filename);
-        });
-
-        document.getElementById('downloadPLBtn').addEventListener('click', () => {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const plData = [];
-            
-            // Header with period
-            plData.push({
-                'Description': 'PROFIT & LOSS STATEMENT',
-                'Amount (£)': ''
-            });
-            plData.push({
-                'Description': `Period: ${startDate} to ${endDate}`,
-                'Amount (£)': ''
-            });
-            plData.push({
-                'Description': '',
-                'Amount (£)': ''
-            });
-            
-            // Income
-            plData.push({
-                'Description': 'INCOME (RECEIPTS)',
-                'Amount (£)': ''
-            });
-            
-            let totalIncome = 0;
-            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => b[1] - a[1]);
-            sortedIncome.forEach(([category, amount]) => {
-                totalIncome += amount;
-                plData.push({
-                    'Description': '  ' + category,
-                    'Amount (£)': amount.toFixed(2)
-                });
-            });
-            
-            plData.push({
-                'Description': 'Total Income',
-                'Amount (£)': totalIncome.toFixed(2)
-            });
-            
-            plData.push({
-                'Description': '',
-                'Amount (£)': ''
-            });
-            
-            // Expenses
-            plData.push({
-                'Description': 'EXPENSES (PAYMENTS)',
-                'Amount (£)': ''
-            });
-            
-            let totalExpenses = 0;
-            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => b[1] - a[1]);
-            sortedExpenses.forEach(([category, amount]) => {
-                totalExpenses += amount;
-                plData.push({
-                    'Description': '  ' + category,
-                    'Amount (£)': amount.toFixed(2)
-                });
-            });
-            
-            plData.push({
-                'Description': 'Total Expenses',
-                'Amount (£)': totalExpenses.toFixed(2)
-            });
-            
-            plData.push({
-                'Description': '',
-                'Amount (£)': ''
-            });
-            
-            // Net Profit/Loss
-            const netProfit = totalIncome - totalExpenses;
-            plData.push({
-                'Description': netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS',
-                'Amount (£)': Math.abs(netProfit).toFixed(2)
-            });
-            
-            // Convert to CSV
-            let csv = 'Description,Amount (£)\\n';
-            plData.forEach(row => {
-                const values = [row['Description'], row['Amount (£)']].map(value => {
-                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
-                        return '"' + value.replace(/"/g, '""') + '"';
-                    }
-                    return value;
-                });
-                csv += values.join(',') + '\\n';
-            });
-            
-            const now = new Date();
-            const filename = `profit_loss_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
-            downloadCSV(csv, filename);
-        });
-
-        document.getElementById('downloadBalanceSheetBtn').addEventListener('click', () => {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const bsData = [];
-            
-            const closingBalance = extractedData.length > 0 ? parseFloat(extractedData[extractedData.length - 1]['Balance (£)']) : 0;
-            const openingBalance = extractedData.length > 0 ? parseFloat(extractedData[0]['Balance (£)']) - (parseFloat(extractedData[0]['Paid in (£)']) || 0) + (parseFloat(extractedData[0]['Paid out (£)']) || 0) : 0;
-            
-            let totalIncome = 0;
-            Object.values(categoryStats.income).forEach(amount => totalIncome += amount);
-            
-            let totalExpenses = 0;
-            Object.values(categoryStats.expenses).forEach(amount => totalExpenses += amount);
-            
-            const netProfit = totalIncome - totalExpenses;
-            const equity = openingBalance + netProfit;
-            
-            // Header with date
-            bsData.push({
-                'Description': 'BALANCE SHEET',
-                'Amount (£)': ''
-            });
-            bsData.push({
-                'Description': `As at: ${endDate}`,
-                'Amount (£)': ''
-            });
-            bsData.push({
-                'Description': '',
-                'Amount (£)': ''
-            });
-            
-            // Assets
-            bsData.push({
-                'Description': 'ASSETS',
-                'Amount (£)': ''
-            });
-            bsData.push({
-                'Description': '  Cash at Bank',
-                'Amount (£)': closingBalance.toFixed(2)
-            });
-            bsData.push({
-                'Description': 'Total Assets',
-                'Amount (£)': closingBalance.toFixed(2)
-            });
-            
-            bsData.push({
-                'Description': '',
-                'Amount (£)': ''
-            });
-            
-            // Equity
-            bsData.push({
-                'Description': 'EQUITY',
-                'Amount (£)': ''
-            });
-            bsData.push({
-                'Description': '  Opening Balance',
-                'Amount (£)': openingBalance.toFixed(2)
-            });
-            bsData.push({
-                'Description': '  Net Profit/(Loss)',
-                'Amount (£)': netProfit.toFixed(2)
-            });
-            bsData.push({
-                'Description': 'Total Equity',
-                'Amount (£)': equity.toFixed(2)
-            });
-            
-            // Convert to CSV
-            let csv = 'Description,Amount (£)\\n';
-            bsData.forEach(row => {
-                const values = [row['Description'], row['Amount (£)']].map(value => {
-                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
-                        return '"' + value.replace(/"/g, '""') + '"';
-                    }
-                    return value;
-                });
-                csv += values.join(',') + '\\n';
-            });
-            
-            const now = new Date();
-            const filename = `balance_sheet_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
             downloadCSV(csv, filename);
         });
 
