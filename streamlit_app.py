@@ -56,6 +56,39 @@ html_content = """
             padding: 40px;
         }
 
+        .bank-selector {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+        }
+
+        .bank-selector label {
+            display: block;
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .bank-selector select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .bank-selector select:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
         .upload-section {
             border: 3px dashed #667eea;
             border-radius: 15px;
@@ -74,6 +107,12 @@ html_content = """
         .upload-section.dragover {
             border-color: #4CAF50;
             background: #e8f5e9;
+        }
+
+        .upload-section.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         .upload-icon {
@@ -164,6 +203,15 @@ html_content = """
             margin-bottom: 15px;
         }
 
+        .bank-detected {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 5px;
+            color: #1976d2;
+            font-weight: 600;
+        }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -239,22 +287,45 @@ html_content = """
             font-size: 12px;
             background: #f8f9fa;
         }
+
+        .warning-message {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 5px;
+            color: #856404;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🏦 Bank Statement Converter</h1>
-            <p>Convert your Tide Bank PDF statements to Excel format instantly</p>
+            <p>Convert your bank PDF statements to Excel format instantly</p>
         </div>
 
         <div class="content">
-            <div class="upload-section" id="uploadSection">
+            <!-- Bank Selection -->
+            <div class="bank-selector">
+                <label for="bankSelect">Select Your Bank:</label>
+                <select id="bankSelect">
+                    <option value="">-- Please Select Your Bank --</option>
+                    <option value="tide">Tide Bank</option>
+                    <option value="barclays">Barclays</option>
+                </select>
+                <div class="warning-message" id="warningMessage" style="display: none;">
+                    ⚠️ Please select your bank before uploading a statement
+                </div>
+            </div>
+
+            <div class="upload-section disabled" id="uploadSection">
                 <div class="upload-icon">📄</div>
                 <h3>Drop your PDF file here</h3>
-                <p>or click to browse</p>
-                <input type="file" id="fileInput" accept=".pdf">
-                <button class="btn" onclick="document.getElementById('fileInput').click()">
+                <p>Please select a bank first</p>
+                <input type="file" id="fileInput" accept=".pdf" disabled>
+                <button class="btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" disabled>
                     Select PDF File
                 </button>
             </div>
@@ -271,17 +342,19 @@ html_content = """
             <div class="result-section" id="resultSection">
                 <h3>✅ Conversion Successful!</h3>
                 
+                <div class="bank-detected" id="bankDetected"></div>
+
                 <div class="stats">
                     <div class="stat-card">
                         <div class="label">Total Transactions</div>
                         <div class="value" id="totalTransactions">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="label">Total Paid In</div>
+                        <div class="label">Total Money In</div>
                         <div class="value" style="color: #4CAF50;" id="totalPaidIn">£0.00</div>
                     </div>
                     <div class="stat-card">
-                        <div class="label">Total Paid Out</div>
+                        <div class="label">Total Money Out</div>
                         <div class="value" style="color: #f44336;" id="totalPaidOut">£0.00</div>
                     </div>
                 </div>
@@ -298,7 +371,7 @@ html_content = """
         </div>
 
         <div class="footer">
-            <p>Supports Tide Bank statement PDFs | Data processed locally in your browser</p>
+            <p>Supports Tide Bank and Barclays statements | Data processed locally in your browser</p>
         </div>
     </div>
 
@@ -308,18 +381,47 @@ html_content = """
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let extractedData = [];
+        let selectedBank = '';
 
+        const bankSelect = document.getElementById('bankSelect');
         const fileInput = document.getElementById('fileInput');
         const uploadSection = document.getElementById('uploadSection');
+        const uploadBtn = document.getElementById('uploadBtn');
         const progressSection = document.getElementById('progressSection');
         const resultSection = document.getElementById('resultSection');
         const errorMessage = document.getElementById('errorMessage');
         const progressBar = document.getElementById('progressBar');
         const statusMessage = document.getElementById('statusMessage');
+        const warningMessage = document.getElementById('warningMessage');
+
+        // Bank selection handler
+        bankSelect.addEventListener('change', (e) => {
+            selectedBank = e.target.value;
+            
+            if (selectedBank) {
+                uploadSection.classList.remove('disabled');
+                fileInput.disabled = false;
+                uploadBtn.disabled = false;
+                uploadSection.querySelector('p').textContent = 'or click to browse';
+                warningMessage.style.display = 'none';
+            } else {
+                uploadSection.classList.add('disabled');
+                fileInput.disabled = true;
+                uploadBtn.disabled = true;
+                uploadSection.querySelector('p').textContent = 'Please select a bank first';
+                warningMessage.style.display = 'block';
+            }
+            
+            // Reset any previous results
+            resultSection.style.display = 'none';
+            hideError();
+        });
 
         uploadSection.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadSection.classList.add('dragover');
+            if (selectedBank) {
+                uploadSection.classList.add('dragover');
+            }
         });
 
         uploadSection.addEventListener('dragleave', () => {
@@ -329,6 +431,13 @@ html_content = """
         uploadSection.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadSection.classList.remove('dragover');
+            
+            if (!selectedBank) {
+                showError('Please select your bank first');
+                warningMessage.style.display = 'block';
+                return;
+            }
+            
             const file = e.dataTransfer.files[0];
             if (file && file.type === 'application/pdf') {
                 processPDF(file);
@@ -345,6 +454,11 @@ html_content = """
         });
 
         async function processPDF(file) {
+            if (!selectedBank) {
+                showError('Please select your bank first');
+                return;
+            }
+
             try {
                 hideError();
                 resultSection.style.display = 'none';
@@ -354,7 +468,7 @@ html_content = """
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
                 
-                updateProgress(30, `Processing ${pdf.numPages} pages...`);
+                updateProgress(30, `Processing ${pdf.numPages} pages for ${bankSelect.options[bankSelect.selectedIndex].text}...`);
 
                 extractedData = [];
 
@@ -370,7 +484,13 @@ html_content = """
                     }));
 
                     const lines = groupIntoLines(items);
-                    extractTableData(lines);
+                    
+                    // Call the appropriate extraction function based on selected bank
+                    if (selectedBank === 'tide') {
+                        extractTideData(lines);
+                    } else if (selectedBank === 'barclays') {
+                        extractBarclaysData(lines);
+                    }
                     
                     const progress = 30 + (pageNum / pdf.numPages) * 60;
                     updateProgress(progress, `Processing page ${pageNum} of ${pdf.numPages}...`);
@@ -379,7 +499,7 @@ html_content = """
                 updateProgress(95, 'Finalizing...');
 
                 if (extractedData.length === 0) {
-                    throw new Error('No transactions found. Please check if this is a valid Tide Bank statement.');
+                    throw new Error(`No transactions found. Please check if this is a valid ${bankSelect.options[bankSelect.selectedIndex].text} statement.`);
                 }
 
                 updateProgress(100, 'Complete!');
@@ -424,7 +544,10 @@ html_content = """
             return lines;
         }
 
-        function extractTableData(lines) {
+        // ========================================
+        // TIDE BANK EXTRACTION (ORIGINAL CODE)
+        // ========================================
+        function extractTideData(lines) {
             for (let line of lines) {
                 const lineText = line.map(item => item.text).join(' ');
                 
@@ -510,19 +633,180 @@ html_content = """
             }
         }
 
+        // ========================================
+        // BARCLAYS BANK EXTRACTION (NEW CODE)
+        // ========================================
+        function extractBarclaysData(lines) {
+            for (let line of lines) {
+                const lineText = line.map(item => item.text).join(' ');
+                const allText = line.map(item => item.text);
+                
+                // Barclays date format: "1 Feb", "3 Feb", "10 Feb", etc.
+                const dateMatch = lineText.match(/^(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))\\b/);
+                
+                if (!dateMatch) continue;
+                
+                const date = dateMatch[1];
+                
+                // Skip header rows and summary rows
+                if (lineText.includes('Description') || 
+                    lineText.includes('Money out') || 
+                    lineText.includes('Money in') ||
+                    lineText.includes('Start Balance') ||
+                    lineText.includes('Balance brought forward') ||
+                    lineText.includes('Balance carried forward') ||
+                    lineText.includes('Total Payments')) {
+                    continue;
+                }
+                
+                // Extract all numbers that look like amounts (format: 1,234.56 or 1234.56)
+                const amountPattern = /\\b\\d{1,3}(?:,\\d{3})*\\.\\d{2}\\b/g;
+                const amounts = [];
+                let match;
+                while ((match = amountPattern.exec(lineText)) !== null) {
+                    amounts.push(match[0].replace(/,/g, ''));
+                }
+                
+                // Need at least 2 amounts (one transaction amount + balance)
+                // Or 3 amounts (money out + money in + balance)
+                if (amounts.length < 1) continue;
+                
+                // Identify transaction type
+                let transactionType = '';
+                if (lineText.includes('Direct Debit') || allText.includes('DD')) {
+                    transactionType = 'Direct Debit';
+                } else if (lineText.includes('Direct Credit') || allText.includes('Giro')) {
+                    transactionType = 'Direct Credit';
+                } else if (lineText.includes('Card Purchase')) {
+                    transactionType = 'Card Purchase';
+                } else if (lineText.includes('Card Payment')) {
+                    transactionType = 'Card Payment';
+                } else if (lineText.includes('Cash Withdrawal') || allText.includes('ATM')) {
+                    transactionType = 'Cash Withdrawal';
+                } else if (lineText.includes('Internet Banking Transfer') || lineText.includes('On-Line Banking')) {
+                    transactionType = 'Online Transfer';
+                } else if (lineText.includes('Commission Charges')) {
+                    transactionType = 'Commission';
+                } else {
+                    transactionType = 'Other';
+                }
+                
+                // Extract description (text between transaction type and first amount)
+                let description = '';
+                const words = allText.filter(t => t && t.length > 0);
+                
+                // Find where transaction type ends and where numbers start
+                let descStart = -1;
+                let descEnd = -1;
+                
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    
+                    // Skip the date
+                    if (word === date.split(' ')[0] || word === date.split(' ')[1]) continue;
+                    
+                    // Skip transaction type keywords
+                    if (word === 'Direct' || word === 'Debit' || word === 'Credit' || 
+                        word === 'Card' || word === 'Purchase' || word === 'Payment' ||
+                        word === 'Cash' || word === 'Withdrawal' || word === 'Internet' ||
+                        word === 'Banking' || word === 'Transfer' || word === 'On-Line' ||
+                        word === 'Commission' || word === 'Charges' || word === 'DD' || 
+                        word === 'Giro' || word === 'ATM' || word === ')))' || word === '—') {
+                        continue;
+                    }
+                    
+                    // Check if this is an amount
+                    if (/\\d{1,3}(?:,\\d{3})*\\.\\d{2}/.test(word)) {
+                        if (descStart !== -1 && descEnd === -1) {
+                            descEnd = i;
+                        }
+                        break;
+                    }
+                    
+                    // Start collecting description
+                    if (descStart === -1) {
+                        descStart = i;
+                    }
+                }
+                
+                if (descStart !== -1) {
+                    if (descEnd === -1) descEnd = words.length;
+                    const descWords = words.slice(descStart, descEnd);
+                    description = descWords.filter(w => !/^\\d{1,3}(?:,\\d{3})*\\.\\d{2}$/.test(w)).join(' ');
+                }
+                
+                description = description.replace(/\\s+/g, ' ').trim();
+                
+                // Determine money in/out/balance
+                let moneyOut = '';
+                let moneyIn = '';
+                let balance = '';
+                
+                if (amounts.length >= 1) {
+                    // Last amount is typically the balance
+                    balance = amounts[amounts.length - 1];
+                    
+                    if (amounts.length === 3) {
+                        // Format: Money Out, Money In, Balance
+                        moneyOut = amounts[0];
+                        moneyIn = amounts[1];
+                    } else if (amounts.length === 2) {
+                        // Format: Transaction Amount, Balance
+                        const txAmount = amounts[0];
+                        
+                        // Determine if it's money in or money out based on transaction type
+                        if (transactionType === 'Direct Credit' || 
+                            transactionType.includes('Credit') ||
+                            (description && (description.toLowerCase().includes('from') || 
+                             description.toLowerCase().includes('youlend') ||
+                             description.toLowerCase().includes('tablesnappr') ||
+                             description.toLowerCase().includes('uber payments') ||
+                             description.toLowerCase().includes('just eat') ||
+                             description.toLowerCase().includes('roofoods')))) {
+                            moneyIn = txAmount;
+                        } else {
+                            moneyOut = txAmount;
+                        }
+                    } else if (amounts.length === 1) {
+                        // Only balance, might be a balance line
+                        balance = amounts[0];
+                    }
+                }
+                
+                // Only add if we have meaningful data
+                if (description || moneyIn || moneyOut) {
+                    extractedData.push({
+                        'Date': date,
+                        'Transaction type': transactionType,
+                        'Details': description,
+                        'Money out (£)': moneyOut,
+                        'Money in (£)': moneyIn,
+                        'Balance (£)': balance
+                    });
+                }
+            }
+        }
+
         function displayResults() {
             progressSection.style.display = 'none';
             resultSection.style.display = 'block';
 
+            // Display selected bank
+            document.getElementById('bankDetected').textContent = `Bank: ${bankSelect.options[bankSelect.selectedIndex].text}`;
+
             let totalPaidIn = 0;
             let totalPaidOut = 0;
 
+            // Different column names based on bank
+            const moneyInCol = selectedBank === 'tide' ? 'Paid in (£)' : 'Money in (£)';
+            const moneyOutCol = selectedBank === 'tide' ? 'Paid out (£)' : 'Money out (£)';
+
             extractedData.forEach(row => {
-                if (row['Paid in (£)']) {
-                    totalPaidIn += parseFloat(row['Paid in (£)']);
+                if (row[moneyInCol]) {
+                    totalPaidIn += parseFloat(row[moneyInCol]);
                 }
-                if (row['Paid out (£)']) {
-                    totalPaidOut += parseFloat(row['Paid out (£)']);
+                if (row[moneyOutCol]) {
+                    totalPaidOut += parseFloat(row[moneyOutCol]);
                 }
             });
 
@@ -530,9 +814,12 @@ html_content = """
             document.getElementById('totalPaidIn').textContent = '£' + totalPaidIn.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalPaidOut').textContent = '£' + totalPaidOut.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
+            // Display preview table
             const previewTable = document.getElementById('previewTable');
             let tableHTML = '<thead><tr>';
-            const headers = ['Date', 'Transaction type', 'Details', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
+            
+            // Get headers from first row
+            const headers = Object.keys(extractedData[0]);
             headers.forEach(header => {
                 tableHTML += `<th>${header}</th>`;
             });
@@ -555,18 +842,19 @@ html_content = """
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
-            const colWidths = [
-                { wch: 15 },
-                { wch: 20 },
-                { wch: 60 },
-                { wch: 15 },
-                { wch: 15 },
-                { wch: 15 }
-            ];
+            // Auto-size columns
+            const headers = Object.keys(extractedData[0]);
+            const colWidths = headers.map(header => {
+                if (header === 'Details') return { wch: 60 };
+                if (header === 'Description') return { wch: 60 };
+                if (header === 'Transaction type') return { wch: 20 };
+                return { wch: 15 };
+            });
             ws['!cols'] = colWidths;
 
             const now = new Date();
-            const filename = `bank_statement_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+            const bankName = selectedBank === 'tide' ? 'Tide' : 'Barclays';
+            const filename = `${bankName}_statement_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
 
             XLSX.writeFile(wb, filename);
         });
@@ -591,5 +879,4 @@ html_content = """
 """
 
 # Display the HTML component
-components.html(html_content, height=1000, scrolling=True)
-
+components.html(html_content, height=1100, scrolling=True)
