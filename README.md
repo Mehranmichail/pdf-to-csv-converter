@@ -1,48 +1,30 @@
 # PDF to CSV Converter
 
-A simple web application that converts PDF files to CSV format using Streamlit.
+A web application that converts PDF files to CSV format.
 
-## 🚀 Live Demo
+## 🚀 Access the App
 
-**[Launch App](https://your-streamlit-app-url.streamlit.app)** ← Replace this with your actual Streamlit app URL
+**[Click here to use the app](https://your-streamlit-app-url.streamlit.app)** ← Replace with your actual Streamlit app URL
 
-## 📋 Features
+## 📋 How to Use
 
-- Upload PDF files
-- Convert PDF tables to CSV format
-- Download converted CSV files
-- Simple and user-friendly interface
+1. Click the link above to open the app
+2. Upload your PDF file
+3. Wait for the conversion to complete
+4. Download your CSV file
 
-## 🛠️ Technologies Used
+## ✨ Features
+
+- No installation required
+- Free to use
+- Simple and fast
+- Secure processing
+
+## 🛠️ Built With
 
 - Python
 - Streamlit
-- PDF processing libraries
 
-## 💻 Local Installation
+---
 
-To run this application locally:
-```bash
-# Clone the repository
-git clone https://github.com/Mehranmichail/pdf-to-csv-converter.git
-
-# Navigate to the project directory
-cd pdf-to-csv-converter
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the app
-streamlit run streamlit_app.py
-```
-
-## 📝 Usage
-
-1. Visit the live app
-2. Upload your PDF file
-3. Wait for processing
-4. Download the converted CSV file
-
-## 📄 License
-
-This project is open source and available under the MIT License.
+For issues or suggestions, please open an issue in this repository.
