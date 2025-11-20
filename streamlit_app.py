@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 # Set page config
 st.set_page_config(page_title="Bank Statement Converter", page_icon="🏦", layout="wide")
 
-# HTML content
+# HTML content with categorization feature
 html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -27,7 +27,7 @@ html_content = """
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -56,39 +56,6 @@ html_content = """
             padding: 40px;
         }
 
-        .bank-selector {
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f8f9ff;
-            border-radius: 10px;
-            border: 2px solid #667eea;
-        }
-
-        .bank-selector label {
-            display: block;
-            font-size: 16px;
-            font-weight: 600;
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-
-        .bank-selector select {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            border: 2px solid #667eea;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .bank-selector select:focus {
-            outline: none;
-            border-color: #764ba2;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
         .upload-section {
             border: 3px dashed #667eea;
             border-radius: 15px;
@@ -107,12 +74,6 @@ html_content = """
         .upload-section.dragover {
             border-color: #4CAF50;
             background: #e8f5e9;
-        }
-
-        .upload-section.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
         }
 
         .upload-icon {
@@ -192,24 +153,19 @@ html_content = """
         .result-section {
             display: none;
             margin-top: 30px;
-            padding: 20px;
+        }
+
+        .result-header {
             background: #f0f8ff;
+            padding: 20px;
             border-radius: 10px;
             border-left: 4px solid #667eea;
+            margin-bottom: 20px;
         }
 
-        .result-section h3 {
+        .result-header h3 {
             color: #667eea;
             margin-bottom: 15px;
-        }
-
-        .bank-detected {
-            margin-bottom: 15px;
-            padding: 10px;
-            background: #e3f2fd;
-            border-radius: 5px;
-            color: #1976d2;
-            font-weight: 600;
         }
 
         .stats {
@@ -236,6 +192,82 @@ html_content = """
             font-size: 24px;
             font-weight: 700;
             color: #667eea;
+        }
+
+        .category-summary {
+            margin-top: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .category-summary h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .category-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .category-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .category-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .category-content {
+            display: none;
+        }
+
+        .category-content.active {
+            display: block;
+        }
+
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .category-item:hover {
+            background: #f8f9ff;
+        }
+
+        .category-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .category-amount {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .category-amount.income {
+            color: #4CAF50;
+        }
+
+        .category-amount.expense {
+            color: #f44336;
         }
 
         .error-message {
@@ -288,14 +320,12 @@ html_content = """
             background: #f8f9fa;
         }
 
-        .warning-message {
-            margin-top: 10px;
-            padding: 10px;
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            border-radius: 5px;
-            color: #856404;
-            font-size: 14px;
+        .chart-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -303,29 +333,16 @@ html_content = """
     <div class="container">
         <div class="header">
             <h1>🏦 Bank Statement Converter</h1>
-            <p>Convert your bank PDF statements to Excel format instantly</p>
+            <p>Convert your bank PDF statements to Excel with automatic categorization</p>
         </div>
 
         <div class="content">
-            <!-- Bank Selection -->
-            <div class="bank-selector">
-                <label for="bankSelect">Select Your Bank:</label>
-                <select id="bankSelect">
-                    <option value="">-- Please Select Your Bank --</option>
-                    <option value="tide">Tide Bank</option>
-                    <option value="barclays">Barclays</option>
-                </select>
-                <div class="warning-message" id="warningMessage" style="display: none;">
-                    ⚠️ Please select your bank before uploading a statement
-                </div>
-            </div>
-
-            <div class="upload-section disabled" id="uploadSection">
+            <div class="upload-section" id="uploadSection">
                 <div class="upload-icon">📄</div>
                 <h3>Drop your PDF file here</h3>
-                <p>Please select a bank first</p>
-                <input type="file" id="fileInput" accept=".pdf" disabled>
-                <button class="btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()" disabled>
+                <p>or click to browse</p>
+                <input type="file" id="fileInput" accept=".pdf">
+                <button class="btn" onclick="document.getElementById('fileInput').click()">
                     Select PDF File
                 </button>
             </div>
@@ -340,88 +357,182 @@ html_content = """
             <div class="error-message" id="errorMessage"></div>
 
             <div class="result-section" id="resultSection">
-                <h3>✅ Conversion Successful!</h3>
-                
-                <div class="bank-detected" id="bankDetected"></div>
+                <div class="result-header">
+                    <h3>✅ Conversion Successful!</h3>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="label">Total Transactions</div>
+                            <div class="value" id="totalTransactions">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Paid In</div>
+                            <div class="value" style="color: #4CAF50;" id="totalPaidIn">£0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Paid Out</div>
+                            <div class="value" style="color: #f44336;" id="totalPaidOut">£0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Categories Found</div>
+                            <div class="value" id="totalCategories">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Net Profit/Loss</div>
+                            <div class="value" id="netProfit">£0.00</div>
+                        </div>
+                    </div>
 
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="label">Total Transactions</div>
-                        <div class="value" id="totalTransactions">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="label">Total Money In</div>
-                        <div class="value" style="color: #4CAF50;" id="totalPaidIn">£0.00</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="label">Total Money Out</div>
-                        <div class="value" style="color: #f44336;" id="totalPaidOut">£0.00</div>
-                    </div>
+                    <button class="btn download-btn" id="downloadBtn">
+                        📥 Download CSV File with Categories
+                    </button>
+                    
+                    <button class="btn download-btn" id="downloadTrialBalanceBtn" style="margin-top: 10px;">
+                        📊 Download Trial Balance (CSV)
+                    </button>
                 </div>
 
-                <button class="btn download-btn" id="downloadBtn">
-                    📥 Download Excel File
-                </button>
+                <div class="category-summary">
+                    <h3>📊 Receipts & Payments by Category</h3>
+                    
+                    <div class="category-tabs">
+                        <button class="category-tab active" onclick="switchTab('income')">Money In (Receipts)</button>
+                        <button class="category-tab" onclick="switchTab('expenses')">Money Out (Payments)</button>
+                    </div>
+
+                    <div id="incomeCategories" class="category-content active"></div>
+                    <div id="expenseCategories" class="category-content"></div>
+                </div>
+
+                <div class="category-summary">
+                    <h3>📑 Trial Balance Preview</h3>
+
+                    <div id="trialBalancePreview"></div>
+                </div>
 
                 <div class="preview-table">
-                    <h4 style="margin-bottom: 10px; color: #667eea;">Preview (First 10 rows)</h4>
+                    <h4 style="margin-bottom: 10px; color: #667eea;">Transaction Preview (First 10 rows)</h4>
                     <table id="previewTable"></table>
                 </div>
             </div>
         </div>
 
         <div class="footer">
-            <p>Supports Tide Bank and Barclays statements | Data processed locally in your browser</p>
+            <p>Supports bank statement PDFs | Data processed locally in your browser | Automatic categorization included</p>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let extractedData = [];
-        let selectedBank = '';
+        let categoryStats = {
+            income: {},
+            expenses: {}
+        };
 
-        const bankSelect = document.getElementById('bankSelect');
+        // Categorization rules
+        const categories = {
+            income: {
+                'Card Payments': ['sumup', 'paymentsense', 'evo payments', 'dojo', 'american express', 'worldpay', 'stripe', 'square', 'paypal'],
+                'Bank Transfers': ['transfer', 'payment received', 'bacs'],
+                'Refunds': ['refund', 'reimbursement'],
+                'Other Income': []
+            },
+            expenses: {
+                'Advertising & Marketing': ['google ads', 'facebook ads', 'meta', 'instagram', 'linkedin', 'twitter', 'tiktok', 'advertising', 'marketing', 'mailchimp', 'hubspot'],
+                'Bank Fees & Charges': ['bank charge', 'bank fee', 'overdraft', 'interest charge', 'account fee', 'transaction fee'],
+                'Office Supplies': ['amazon', 'staples', 'office depot', 'ryman', 'viking', 'supplies'],
+                'Professional Services': ['accountant', 'solicitor', 'lawyer', 'consultant', 'hmrc', 'companies house'],
+                'Software & Subscriptions': ['microsoft', 'adobe', 'dropbox', 'zoom', 'slack', 'canva', 'notion', 'asana', 'trello', 'xero', 'quickbooks', 'sage', 'shopify', 'wix', 'squarespace'],
+                'Utilities & Communications': ['bt', 'vodafone', 'o2', 'ee', 'three', 'virgin', 'sky', 'talk talk', 'plusnet', 'telephone', 'internet', 'broadband', 'mobile'],
+                'Travel & Transport': ['uber', 'trainline', 'national rail', 'tfl', 'transport for london', 'parking', 'petrol', 'fuel', 'shell', 'bp', 'esso', 'tesco fuel'],
+                'Meals & Entertainment': ['restaurant', 'cafe', 'coffee', 'starbucks', 'costa', 'pret', 'food', 'lunch', 'dinner', 'deliveroo', 'uber eats', 'just eat'],
+                'Rent & Property': ['rent', 'lease', 'property', 'landlord', 'commercial rent'],
+                'Equipment & Technology': ['currys', 'pc world', 'apple', 'dell', 'hp', 'lenovo', 'equipment'],
+                'Insurance': ['insurance', 'policy', 'premium'],
+                'Payment Processing Fees': ['sumup fee', 'stripe fee', 'paypal fee', 'merchant fee', 'card fee'],
+                'Cost of Goods Sold': ['supplier', 'wholesale', 'inventory', 'stock', 'manufacturer'],
+                'Payroll & Staff': ['salary', 'wage', 'payroll', 'hmrc paye', 'pension'],
+                'Taxes': ['vat', 'tax', 'hmrc', 'corporation tax', 'self assessment'],
+                'General Business Expenses': []
+            }
+        };
+
+        function categorizeTransaction(details, transType, paidIn, paidOut) {
+            const detailsLower = details.toLowerCase();
+            
+            // Determine if it's income or expense
+            const isIncome = paidIn !== '';
+            const categoryGroup = isIncome ? categories.income : categories.expenses;
+            
+            // Search through categories
+            for (const [categoryName, keywords] of Object.entries(categoryGroup)) {
+                for (const keyword of keywords) {
+                    if (detailsLower.includes(keyword)) {
+                        return categoryName;
+                    }
+                }
+            }
+            
+            // Default categories based on transaction type
+            if (isIncome) {
+                if (transType === 'Card Transaction Refund') return 'Refunds';
+                if (transType === 'Domestic Transfer') return 'Bank Transfers';
+                return 'Other Income';
+            } else {
+                if (transType === 'Direct Debit') return 'Utilities & Communications';
+                if (transType === 'Fee') return 'Bank Fees & Charges';
+                return 'General Business Expenses';
+            }
+        }
+
+        // CSV conversion functions
+        function convertToCSV(data) {
+            const headers = ['Date', 'Transaction type', 'Details', 'Category', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
+            let csv = headers.join(',') + '\\n';
+            
+            data.forEach(row => {
+                const values = headers.map(header => {
+                    let value = row[header] || '';
+                    // Escape values that contain commas or quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\\n';
+            });
+            
+            return csv;
+        }
+
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
         const fileInput = document.getElementById('fileInput');
         const uploadSection = document.getElementById('uploadSection');
-        const uploadBtn = document.getElementById('uploadBtn');
         const progressSection = document.getElementById('progressSection');
         const resultSection = document.getElementById('resultSection');
         const errorMessage = document.getElementById('errorMessage');
         const progressBar = document.getElementById('progressBar');
         const statusMessage = document.getElementById('statusMessage');
-        const warningMessage = document.getElementById('warningMessage');
-
-        // Bank selection handler
-        bankSelect.addEventListener('change', (e) => {
-            selectedBank = e.target.value;
-            
-            if (selectedBank) {
-                uploadSection.classList.remove('disabled');
-                fileInput.disabled = false;
-                uploadBtn.disabled = false;
-                uploadSection.querySelector('p').textContent = 'or click to browse';
-                warningMessage.style.display = 'none';
-            } else {
-                uploadSection.classList.add('disabled');
-                fileInput.disabled = true;
-                uploadBtn.disabled = true;
-                uploadSection.querySelector('p').textContent = 'Please select a bank first';
-                warningMessage.style.display = 'block';
-            }
-            
-            // Reset any previous results
-            resultSection.style.display = 'none';
-            hideError();
-        });
 
         uploadSection.addEventListener('dragover', (e) => {
             e.preventDefault();
-            if (selectedBank) {
-                uploadSection.classList.add('dragover');
-            }
+            uploadSection.classList.add('dragover');
         });
 
         uploadSection.addEventListener('dragleave', () => {
@@ -431,13 +542,6 @@ html_content = """
         uploadSection.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadSection.classList.remove('dragover');
-            
-            if (!selectedBank) {
-                showError('Please select your bank first');
-                warningMessage.style.display = 'block';
-                return;
-            }
-            
             const file = e.dataTransfer.files[0];
             if (file && file.type === 'application/pdf') {
                 processPDF(file);
@@ -454,11 +558,6 @@ html_content = """
         });
 
         async function processPDF(file) {
-            if (!selectedBank) {
-                showError('Please select your bank first');
-                return;
-            }
-
             try {
                 hideError();
                 resultSection.style.display = 'none';
@@ -468,9 +567,10 @@ html_content = """
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
                 
-                updateProgress(30, `Processing ${pdf.numPages} pages for ${bankSelect.options[bankSelect.selectedIndex].text}...`);
+                updateProgress(30, `Processing ${pdf.numPages} pages...`);
 
                 extractedData = [];
+                categoryStats = { income: {}, expenses: {} };
 
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                     const page = await pdf.getPage(pageNum);
@@ -484,23 +584,34 @@ html_content = """
                     }));
 
                     const lines = groupIntoLines(items);
+                    extractTableData(lines);
                     
-                    // Call the appropriate extraction function based on selected bank
-                    if (selectedBank === 'tide') {
-                        extractTideData(lines);
-                    } else if (selectedBank === 'barclays') {
-                        extractBarclaysData(lines);
-                    }
-                    
-                    const progress = 30 + (pageNum / pdf.numPages) * 60;
+                    const progress = 30 + (pageNum / pdf.numPages) * 50;
                     updateProgress(progress, `Processing page ${pageNum} of ${pdf.numPages}...`);
                 }
 
-                updateProgress(95, 'Finalizing...');
+                updateProgress(85, 'Categorizing transactions...');
 
-                if (extractedData.length === 0) {
-                    throw new Error(`No transactions found. Please check if this is a valid ${bankSelect.options[bankSelect.selectedIndex].text} statement.`);
-                }
+                // Add categories to extracted data
+                extractedData.forEach(row => {
+                    const category = categorizeTransaction(
+                        row['Details'],
+                        row['Transaction type'],
+                        row['Paid in (£)'],
+                        row['Paid out (£)']
+                    );
+                    row['Category'] = category;
+                    
+                    // Update category stats
+                    if (row['Paid in (£)']) {
+                        const amount = parseFloat(row['Paid in (£)']);
+                        categoryStats.income[category] = (categoryStats.income[category] || 0) + amount;
+                    }
+                    if (row['Paid out (£)']) {
+                        const amount = parseFloat(row['Paid out (£)']);
+                        categoryStats.expenses[category] = (categoryStats.expenses[category] || 0) + amount;
+                    }
+                });
 
                 updateProgress(100, 'Complete!');
                 displayResults();
@@ -544,10 +655,7 @@ html_content = """
             return lines;
         }
 
-        // ========================================
-        // TIDE BANK EXTRACTION (ORIGINAL CODE)
-        // ========================================
-        function extractTideData(lines) {
+        function extractTableData(lines) {
             for (let line of lines) {
                 const lineText = line.map(item => item.text).join(' ');
                 
@@ -633,193 +741,45 @@ html_content = """
             }
         }
 
-        // ========================================
-        // BARCLAYS BANK EXTRACTION (NEW CODE)
-        // ========================================
-        function extractBarclaysData(lines) {
-            for (let line of lines) {
-                const lineText = line.map(item => item.text).join(' ');
-                const allText = line.map(item => item.text);
-                
-                // Barclays date format: "1 Feb", "3 Feb", "10 Feb", etc.
-                const dateMatch = lineText.match(/^(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))\\b/);
-                
-                if (!dateMatch) continue;
-                
-                const date = dateMatch[1];
-                
-                // Skip header rows and summary rows
-                if (lineText.includes('Description') || 
-                    lineText.includes('Money out') || 
-                    lineText.includes('Money in') ||
-                    lineText.includes('Start Balance') ||
-                    lineText.includes('Balance brought forward') ||
-                    lineText.includes('Balance carried forward') ||
-                    lineText.includes('Total Payments')) {
-                    continue;
-                }
-                
-                // Extract all numbers that look like amounts (format: 1,234.56 or 1234.56)
-                const amountPattern = /\\b\\d{1,3}(?:,\\d{3})*\\.\\d{2}\\b/g;
-                const amounts = [];
-                let match;
-                while ((match = amountPattern.exec(lineText)) !== null) {
-                    amounts.push(match[0].replace(/,/g, ''));
-                }
-                
-                // Need at least 2 amounts (one transaction amount + balance)
-                // Or 3 amounts (money out + money in + balance)
-                if (amounts.length < 1) continue;
-                
-                // Identify transaction type
-                let transactionType = '';
-                if (lineText.includes('Direct Debit') || allText.includes('DD')) {
-                    transactionType = 'Direct Debit';
-                } else if (lineText.includes('Direct Credit') || allText.includes('Giro')) {
-                    transactionType = 'Direct Credit';
-                } else if (lineText.includes('Card Purchase')) {
-                    transactionType = 'Card Purchase';
-                } else if (lineText.includes('Card Payment')) {
-                    transactionType = 'Card Payment';
-                } else if (lineText.includes('Cash Withdrawal') || allText.includes('ATM')) {
-                    transactionType = 'Cash Withdrawal';
-                } else if (lineText.includes('Internet Banking Transfer') || lineText.includes('On-Line Banking')) {
-                    transactionType = 'Online Transfer';
-                } else if (lineText.includes('Commission Charges')) {
-                    transactionType = 'Commission';
-                } else {
-                    transactionType = 'Other';
-                }
-                
-                // Extract description (text between transaction type and first amount)
-                let description = '';
-                const words = allText.filter(t => t && t.length > 0);
-                
-                // Find where transaction type ends and where numbers start
-                let descStart = -1;
-                let descEnd = -1;
-                
-                for (let i = 0; i < words.length; i++) {
-                    const word = words[i];
-                    
-                    // Skip the date
-                    if (word === date.split(' ')[0] || word === date.split(' ')[1]) continue;
-                    
-                    // Skip transaction type keywords
-                    if (word === 'Direct' || word === 'Debit' || word === 'Credit' || 
-                        word === 'Card' || word === 'Purchase' || word === 'Payment' ||
-                        word === 'Cash' || word === 'Withdrawal' || word === 'Internet' ||
-                        word === 'Banking' || word === 'Transfer' || word === 'On-Line' ||
-                        word === 'Commission' || word === 'Charges' || word === 'DD' || 
-                        word === 'Giro' || word === 'ATM' || word === ')))' || word === '—') {
-                        continue;
-                    }
-                    
-                    // Check if this is an amount
-                    if (/\\d{1,3}(?:,\\d{3})*\\.\\d{2}/.test(word)) {
-                        if (descStart !== -1 && descEnd === -1) {
-                            descEnd = i;
-                        }
-                        break;
-                    }
-                    
-                    // Start collecting description
-                    if (descStart === -1) {
-                        descStart = i;
-                    }
-                }
-                
-                if (descStart !== -1) {
-                    if (descEnd === -1) descEnd = words.length;
-                    const descWords = words.slice(descStart, descEnd);
-                    description = descWords.filter(w => !/^\\d{1,3}(?:,\\d{3})*\\.\\d{2}$/.test(w)).join(' ');
-                }
-                
-                description = description.replace(/\\s+/g, ' ').trim();
-                
-                // Determine money in/out/balance
-                let moneyOut = '';
-                let moneyIn = '';
-                let balance = '';
-                
-                if (amounts.length >= 1) {
-                    // Last amount is typically the balance
-                    balance = amounts[amounts.length - 1];
-                    
-                    if (amounts.length === 3) {
-                        // Format: Money Out, Money In, Balance
-                        moneyOut = amounts[0];
-                        moneyIn = amounts[1];
-                    } else if (amounts.length === 2) {
-                        // Format: Transaction Amount, Balance
-                        const txAmount = amounts[0];
-                        
-                        // Determine if it's money in or money out based on transaction type
-                        if (transactionType === 'Direct Credit' || 
-                            transactionType.includes('Credit') ||
-                            (description && (description.toLowerCase().includes('from') || 
-                             description.toLowerCase().includes('youlend') ||
-                             description.toLowerCase().includes('tablesnappr') ||
-                             description.toLowerCase().includes('uber payments') ||
-                             description.toLowerCase().includes('just eat') ||
-                             description.toLowerCase().includes('roofoods')))) {
-                            moneyIn = txAmount;
-                        } else {
-                            moneyOut = txAmount;
-                        }
-                    } else if (amounts.length === 1) {
-                        // Only balance, might be a balance line
-                        balance = amounts[0];
-                    }
-                }
-                
-                // Only add if we have meaningful data
-                if (description || moneyIn || moneyOut) {
-                    extractedData.push({
-                        'Date': date,
-                        'Transaction type': transactionType,
-                        'Details': description,
-                        'Money out (£)': moneyOut,
-                        'Money in (£)': moneyIn,
-                        'Balance (£)': balance
-                    });
-                }
-            }
-        }
-
         function displayResults() {
             progressSection.style.display = 'none';
             resultSection.style.display = 'block';
 
-            // Display selected bank
-            document.getElementById('bankDetected').textContent = `Bank: ${bankSelect.options[bankSelect.selectedIndex].text}`;
-
             let totalPaidIn = 0;
             let totalPaidOut = 0;
 
-            // Different column names based on bank
-            const moneyInCol = selectedBank === 'tide' ? 'Paid in (£)' : 'Money in (£)';
-            const moneyOutCol = selectedBank === 'tide' ? 'Paid out (£)' : 'Money out (£)';
-
             extractedData.forEach(row => {
-                if (row[moneyInCol]) {
-                    totalPaidIn += parseFloat(row[moneyInCol]);
+                if (row['Paid in (£)']) {
+                    totalPaidIn += parseFloat(row['Paid in (£)']);
                 }
-                if (row[moneyOutCol]) {
-                    totalPaidOut += parseFloat(row[moneyOutCol]);
+                if (row['Paid out (£)']) {
+                    totalPaidOut += parseFloat(row['Paid out (£)']);
                 }
             });
+
+            const netProfit = totalPaidIn - totalPaidOut;
+            const totalCategories = Object.keys(categoryStats.income).length + Object.keys(categoryStats.expenses).length;
 
             document.getElementById('totalTransactions').textContent = extractedData.length;
             document.getElementById('totalPaidIn').textContent = '£' + totalPaidIn.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('totalPaidOut').textContent = '£' + totalPaidOut.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('totalCategories').textContent = totalCategories;
+            
+            const netProfitElement = document.getElementById('netProfit');
+            netProfitElement.textContent = '£' + netProfit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            netProfitElement.style.color = netProfit >= 0 ? '#4CAF50' : '#f44336';
+
+            // Display category summaries
+            displayCategorySummary('income', 'incomeCategories');
+            displayCategorySummary('expenses', 'expenseCategories');
+            
+            // Display trial balance
+            displayTrialBalance();
 
             // Display preview table
             const previewTable = document.getElementById('previewTable');
             let tableHTML = '<thead><tr>';
-            
-            // Get headers from first row
-            const headers = Object.keys(extractedData[0]);
+            const headers = ['Date', 'Transaction type', 'Details', 'Category', 'Paid in (£)', 'Paid out (£)', 'Balance (£)'];
             headers.forEach(header => {
                 tableHTML += `<th>${header}</th>`;
             });
@@ -837,26 +797,284 @@ html_content = """
             previewTable.innerHTML = tableHTML;
         }
 
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            const ws = XLSX.utils.json_to_sheet(extractedData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
-
-            // Auto-size columns
-            const headers = Object.keys(extractedData[0]);
-            const colWidths = headers.map(header => {
-                if (header === 'Details') return { wch: 60 };
-                if (header === 'Description') return { wch: 60 };
-                if (header === 'Transaction type') return { wch: 20 };
-                return { wch: 15 };
+        function displayCategorySummary(type, elementId) {
+            const container = document.getElementById(elementId);
+            const stats = categoryStats[type];
+            
+            // Sort categories by amount (descending)
+            const sortedCategories = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+            
+            let html = '';
+            sortedCategories.forEach(([category, amount]) => {
+                const formattedAmount = '£' + amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const colorClass = type === 'income' ? 'income' : 'expense';
+                html += `
+                    <div class="category-item">
+                        <span class="category-name">${category}</span>
+                        <span class="category-amount ${colorClass}">${formattedAmount}</span>
+                    </div>
+                `;
             });
-            ws['!cols'] = colWidths;
+            
+            if (sortedCategories.length === 0) {
+                html = '<p style="color: #999; text-align: center; padding: 20px;">No transactions in this category</p>';
+            }
+            
+            container.innerHTML = html;
+        }
 
+        function parseStatementDate(dateStr) {
+            // Parse "1 Jan 2024" format to "2024-01-01"
+            const months = {
+                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+            };
+            const parts = dateStr.trim().split(/\\s+/);
+            const day = parts[0].padStart(2, '0');
+            const month = months[parts[1]];
+            const year = parts[2];
+            return `${year}-${month}-${day}`;
+        }
+
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.category-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.category-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            if (tab === 'income') {
+                document.getElementById('incomeCategories').classList.add('active');
+            } else {
+                document.getElementById('expenseCategories').classList.add('active');
+            }
+        }
+
+        function displayTrialBalance() {
+            const container = document.getElementById('trialBalancePreview');
+            
+            let html = '<div style="overflow-x: auto;"><table style="width: 100%; margin-top: 10px;">';
+            html += '<thead><tr><th>Account</th><th>Debit (£)</th><th>Credit (£)</th></tr></thead><tbody>';
+            
+            let totalDebit = 0;
+            let totalCredit = 0;
+            
+            // Income categories (Credits) - Money received
+            html += '<tr style="background: #f0f8ff;"><td colspan="3"><strong>INCOME</strong></td></tr>';
+            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedIncome.forEach(([category, amount]) => {
+                totalCredit += amount;
+                html += `<tr>
+                    <td>${category}</td>
+                    <td>-</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            });
+            
+            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
+            
+            // Expense categories (Debits) - Money paid out
+            html += '<tr style="background: #fff3e0;"><td colspan="3"><strong>EXPENSES</strong></td></tr>';
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedExpenses.forEach(([category, amount]) => {
+                totalDebit += amount;
+                html += `<tr>
+                    <td>${category}</td>
+                    <td style="text-align: right;">${amount.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>-</td>
+                </tr>`;
+            });
+            
+            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
+            
+            // Calculate net movement (income - expenses)
+            const netMovement = totalCredit - totalDebit;
+            
+            // Bank Account - shows the net effect
+            html += '<tr style="background: #e8f5e9;"><td colspan="3"><strong>ASSETS</strong></td></tr>';
+            if (netMovement >= 0) {
+                // Net income - Bank account increases (Debit)
+                totalDebit += netMovement;
+                html += `<tr>
+                    <td>Bank Account</td>
+                    <td style="text-align: right;">${netMovement.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>-</td>
+                </tr>`;
+            } else {
+                // Net loss - Bank account decreases (Credit)
+                totalCredit += Math.abs(netMovement);
+                html += `<tr>
+                    <td>Bank Account</td>
+                    <td>-</td>
+                    <td style="text-align: right;">${Math.abs(netMovement).toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>`;
+            }
+            
+            // Totals
+            html += '<tr style="height: 10px;"><td colspan="3"></td></tr>';
+            html += `<tr style="border-top: 2px solid #667eea; background: #f0f8ff;">
+                <td><strong>TOTAL</strong></td>
+                <td style="text-align: right;"><strong>${totalDebit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td style="text-align: right;"><strong>${totalCredit.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+            </tr>`;
+            
+            html += '</tbody></table></div>';
+            
+            // Add explanatory note
+            html += `<p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; font-size: 12px; color: #1565C0;">
+                ℹ️ <strong>Note:</strong> This Trial Balance represents the movement in cash during the period based on transactions in the bank statement. It does not include opening balances.
+            </p>`;
+            
+            // Check if balanced
+            const difference = Math.abs(totalDebit - totalCredit);
+            if (difference < 0.01) {
+                html += `<p style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-left: 4px solid #4CAF50; font-size: 12px; color: #2e7d32;">
+                    ✅ <strong>Trial Balance is balanced!</strong> Debits equal Credits.
+                </p>`;
+            } else {
+                html += `<p style="margin-top: 15px; padding: 10px; background: #ffebee; border-left: 4px solid #f44336; font-size: 12px; color: #c62828;">
+                    ⚠️ <strong>Warning:</strong> Trial Balance difference of £${difference.toFixed(2)}
+                </p>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const csvContent = convertToCSV(extractedData);
             const now = new Date();
-            const bankName = selectedBank === 'tide' ? 'Tide' : 'Barclays';
-            const filename = `${bankName}_statement_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.xlsx`;
+            const filename = `bank_statement_categorized_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
+            downloadCSV(csvContent, filename);
+        });
 
-            XLSX.writeFile(wb, filename);
+        document.getElementById('downloadTrialBalanceBtn').addEventListener('click', () => {
+            const trialBalanceData = [];
+            
+            // Add header
+            trialBalanceData.push({
+                'Account': 'TRIAL BALANCE',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            trialBalanceData.push({
+                'Account': 'Period transactions only (excluding opening balances)',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            let totalDebit = 0;
+            let totalCredit = 0;
+            
+            // Income (Credits)
+            trialBalanceData.push({
+                'Account': 'INCOME',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            const sortedIncome = Object.entries(categoryStats.income).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedIncome.forEach(([category, amount]) => {
+                totalCredit += amount;
+                trialBalanceData.push({
+                    'Account': category,
+                    'Debit (£)': '',
+                    'Credit (£)': amount.toFixed(2)
+                });
+            });
+            
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            // Expenses (Debits)
+            trialBalanceData.push({
+                'Account': 'EXPENSES',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            const sortedExpenses = Object.entries(categoryStats.expenses).sort((a, b) => a[0].localeCompare(b[0]));
+            sortedExpenses.forEach(([category, amount]) => {
+                totalDebit += amount;
+                trialBalanceData.push({
+                    'Account': category,
+                    'Debit (£)': amount.toFixed(2),
+                    'Credit (£)': ''
+                });
+            });
+            
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            // Bank Account - net movement
+            trialBalanceData.push({
+                'Account': 'ASSETS',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            
+            const netMovement = totalCredit - totalDebit;
+            if (netMovement >= 0) {
+                // Net income - Bank increases (Debit)
+                totalDebit += netMovement;
+                trialBalanceData.push({
+                    'Account': 'Bank Account',
+                    'Debit (£)': netMovement.toFixed(2),
+                    'Credit (£)': ''
+                });
+            } else {
+                // Net loss - Bank decreases (Credit)
+                totalCredit += Math.abs(netMovement);
+                trialBalanceData.push({
+                    'Account': 'Bank Account',
+                    'Debit (£)': '',
+                    'Credit (£)': Math.abs(netMovement).toFixed(2)
+                });
+            }
+            
+            // Totals
+            trialBalanceData.push({
+                'Account': '',
+                'Debit (£)': '',
+                'Credit (£)': ''
+            });
+            trialBalanceData.push({
+                'Account': 'TOTAL',
+                'Debit (£)': totalDebit.toFixed(2),
+                'Credit (£)': totalCredit.toFixed(2)
+            });
+            
+            // Convert to CSV
+            let csv = 'Account,Debit (£),Credit (£)\\n';
+            trialBalanceData.forEach(row => {
+                const values = [row['Account'], row['Debit (£)'], row['Credit (£)']].map(value => {
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\\n';
+            });
+            
+            const now = new Date();
+            const filename = `trial_balance_${now.getFullYear()}_${(now.getMonth()+1).toString().padStart(2,'0')}_${now.getDate().toString().padStart(2,'0')}.csv`;
+            downloadCSV(csv, filename);
         });
 
         function updateProgress(percent, message) {
@@ -879,4 +1097,4 @@ html_content = """
 """
 
 # Display the HTML component
-components.html(html_content, height=1100, scrolling=True)
+components.html(html_content, height=1200, scrolling=True)
